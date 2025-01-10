@@ -31,7 +31,7 @@ public class ChatController {
     }
 
     @PostMapping("/ChatBot")
-    @Operation(summary = "Query the chatbot", description = "Send a query to the chatbot and get a response.")
+    @Operation(summary = "Query the chatBot", description = "Send a query to the chatbot and get a response.")
     public ResponseEntity<String> queryChat(
             @Parameter(description = "Message to ask the chatbot") @RequestBody String message) {
         String response = chatService.chatBot(message);
@@ -39,7 +39,7 @@ public class ChatController {
     }
 
     @PostMapping("/CodeBot")
-    @Operation(summary = "Query the chatbot to generate code", description = "Send a prompt to the chatbot to generate code")
+    @Operation(summary = "Query the codeBot to generate code", description = "Send a prompt to the chatbot to generate code")
     public ResponseEntity<String> generateCode(@RequestBody String prompt) {
         try {
             String code = chatService.codeGeneratorBot(prompt);
