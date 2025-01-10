@@ -30,19 +30,19 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/question")
+    @PostMapping("/ChatBot")
     @Operation(summary = "Query the chatbot", description = "Send a query to the chatbot and get a response.")
     public ResponseEntity<String> queryChat(
             @Parameter(description = "Message to ask the chatbot") @RequestBody String message) {
-        String response = chatService.handleQuery(message);
+        String response = chatService.chatBot(message);
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/generateCode")
+    @PostMapping("/Code/Bot")
     @Operation(summary = "Query the chatbot for code", description = "Send a prompt to the chatbot to generate code")
     public ResponseEntity<String> generateCode(@RequestBody String prompt) {
         try {
-            String code = chatService.generateCode(prompt);
+            String code = chatService.codeGeneratorBot(prompt);
             return ResponseEntity.ok(code);
         } catch (Exception e) {
             return ResponseEntity.internalServerError().body("Error generating code: " + e.getMessage());

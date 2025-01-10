@@ -79,7 +79,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public String handleQuery(String question) {
+    public String chatBot(String question) {
         log.info("Received query: {}", question);
         // Retrieve similar documents from the vector store
         List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
@@ -111,7 +111,7 @@ public class ChatServiceImpl implements ChatService {
     }
 
     @Override
-    public String generateCode(String prompt) {
+    public String codeGeneratorBot(String prompt) {
         log.info("Received code generation prompt: {}", prompt);
 
         // Define a code generation template

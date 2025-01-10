@@ -17,7 +17,7 @@ public interface ChatService {
      * @param question The query to be asked to the chatbot.
      * @return The chatbot's response.
      */
-    String handleQuery(String question);
+    String chatBot(String question);
 
     /**
      * Generates code based on the provided prompt.
@@ -25,5 +25,5 @@ public interface ChatService {
      * @param prompt The prompt that describes the code to be generated.
      * @return The generated code.
      */
-    String generateCode(String prompt);
+    String codeGeneratorBot(String prompt);
 }
