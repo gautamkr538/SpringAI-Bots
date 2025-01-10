@@ -69,9 +69,6 @@ public class ChatServiceImpl implements ChatService {
         } catch (FileNotFoundException e) {
             log.error("File not found: ", e);
             throw new RuntimeException("File not found", e);
-        } catch (IOException e) {
-            log.error("Error while processing the file: ", e);
-            throw new RuntimeException("Error while processing the file", e);
         } catch (Exception e) {
             log.error("Unexpected error during vector store initialization", e);
             throw new RuntimeException("Unexpected error during vector store initialization", e);
@@ -87,7 +84,7 @@ public class ChatServiceImpl implements ChatService {
         String documents = similarDocuments.stream()
                 .map(Document::getContent)
                 .collect(Collectors.joining(System.lineSeparator()));
-        // Define a prompt template
+        // Define a template
         String template = """
                 If the information is available in the DOCUMENTS,
                 respond with the relevant details as if you innately knew them.
