@@ -33,7 +33,7 @@ public class ChatController {
         return ResponseEntity.ok("Vector store initialized with the PDF data successfully.");
     }
 
-    @PostMapping("/ChatBot")
+    @PostMapping("/chatBot")
     @Operation(summary = "Query the chatBot", description = "Send a query to the chatbot and get a response.")
     public ResponseEntity<String> queryChat(
             @Parameter(description = "Message to ask the chatbot") @RequestBody String message) {
@@ -41,14 +41,14 @@ public class ChatController {
         return ResponseEntity.ok(response);
     }
 
-    @PostMapping("/CodeBot")
+    @PostMapping("/codeBot")
     @Operation(summary = "Query the codeBot to generate code", description = "Send a prompt to the chatbot to generate code")
     public ResponseEntity<String> generateCode(@RequestBody String prompt) {
         String code = chatService.codeGeneratorBot(prompt);
         return ResponseEntity.ok(code);
     }
 
-    @PostMapping("/CrawlStore")
+    @PostMapping("/crawlWeb/store")
     @Operation(summary = "Crawl a website and store content", description = "Crawl a website and store the extracted content")
     public ResponseEntity<String> crawlAndStoreContent(@RequestBody WebDataRequest request) throws IOException {
         List<String> contentList = webDataService.crawlAndExtractContent(request.getUrl());
@@ -56,7 +56,7 @@ public class ChatController {
         return ResponseEntity.ok("Content crawled and stored successfully.");
     }
 
-    @PostMapping("/QueryContent")
+    @PostMapping("/query/webContent")
     @Operation(summary = "Search for relevant content based on the query", description = "Search for content in the stored data and provide a relevant response")
     public ResponseEntity<String> queryContent(@RequestBody WebDataRequest request) {
         String response = webDataService.queryContent(request.getQuery());
