@@ -78,17 +78,14 @@ public class ChatServiceImpl implements ChatService {
     @Override
     public String chatBot(String question) {
         log.info("Received query: {}", question);
-        // Retrieve similar documents from the vector store
-        List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
-        // Combine content from similar documents
-        String documents = similarDocuments.stream()
-                .map(Document::getContent)
-                .collect(Collectors.joining(System.lineSeparator()));
-        // Define a template
-        String template = """
+        try {
+            List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
+            String documents = similarDocuments.stream()
+                    .map(Document::getContent)
+                    .collect(Collectors.joining(System.lineSeparator()));
+            String template = """
                 If the information is available in the DOCUMENTS,
                 respond with the relevant details as if you innately knew them.
-                
                 If the information is not found in the DOCUMENTS,
                 clearly state: "The data is not available in the provided document.
                 Here's my response based on my knowledge."
@@ -96,37 +93,38 @@ public class ChatServiceImpl implements ChatService {
                 DOCUMENTS:
                 {documents}
                 """;
-        // Replace placeholders in the template with document content
-        SystemMessage systemMessage = new SystemMessage(template.replace("{documents}", documents));
-        UserMessage userMessage = new UserMessage(question);
-        // Create a prompt with system and user messages
-        Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
-        // Call the chat client
-        String response = chatClient.prompt(prompt).call().content();
-        log.info("Response generated: {}", response);
-        return response;
+            SystemMessage systemMessage = new SystemMessage(template.replace("{documents}", documents));
+            UserMessage userMessage = new UserMessage(question);
+            Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
+            String response = chatClient.prompt(prompt).call().content();
+            log.info("Response generated: {}", response);
+            return response;
+        } catch (Exception e) {
+            log.error("Error processing the chatbot query: ", e);
+            return "An error occurred while processing the query. Please try again later.";
+        }
     }
 
     @Override
     public String codeGeneratorBot(String prompt) {
         log.info("Received code generation prompt: {}", prompt);
-
-        // Define a code generation template
-        String template = """
+        try {
+            String template = """
                 Based on the provided prompt, generate the corresponding code without extra spacing.
                 If the prompt is not asking for code generation, clearly state:
                 "This is the Code Generator Bot. Please use the ChatBot for any type of information."
                 
                 {prompt}
                 """;
-        // Replace placeholder with actual user prompt
-        SystemMessage systemMessage = new SystemMessage(template.replace("{prompt}", prompt));
-        UserMessage userMessage = new UserMessage(prompt);
-        // Create a prompt with system and user messages
-        Prompt codePrompt = new Prompt(List.of(systemMessage, userMessage));
-        // Generate code by calling the chat client
-        String generatedCode = chatClient.prompt(codePrompt).call().content();
-        log.info("Generated code: {}", generatedCode);
-        return generatedCode;
+            SystemMessage systemMessage = new SystemMessage(template.replace("{prompt}", prompt));
+            UserMessage userMessage = new UserMessage(prompt);
+            Prompt codePrompt = new Prompt(List.of(systemMessage, userMessage));
+            String generatedCode = chatClient.prompt(codePrompt).call().content();
+            log.info("Generated code: {}", generatedCode);
+            return generatedCode;
+        } catch (Exception e) {
+            log.error("Error generating code: ", e);
+            return "An error occurred while generating the code. Please try again later.";
+        }
     }
 }
