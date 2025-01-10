@@ -18,7 +18,7 @@ public class ChatController {
         this.chatService = chatService;
     }
 
-    @PostMapping("/initialize/vector/store")
+    @PostMapping("/initialize/vector")
     @Operation(summary = "Initialize the vector store with PDF data", description = "Uploads a PDF file and processes it into the vector store.")
     public ResponseEntity<String> initializeVectorStore(
             @Parameter(description = "PDF file resource to upload") @RequestParam("file") MultipartFile file) {
@@ -30,11 +30,22 @@ public class ChatController {
         }
     }
 
-    @PostMapping("/query/question")
+    @PostMapping("/question")
     @Operation(summary = "Query the chatbot", description = "Send a query to the chatbot and get a response.")
     public ResponseEntity<String> queryChat(
             @Parameter(description = "Message to ask the chatbot") @RequestBody String message) {
         String response = chatService.handleQuery(message);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/generateCode")
+    @Operation(summary = "Query the chatbot for code", description = "Send a prompt to the chatbot to generate code")
+    public ResponseEntity<String> generateCode(@RequestBody String prompt) {
+        try {
+            String code = chatService.generateCode(prompt);
+            return ResponseEntity.ok(code);
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError().body("Error generating code: " + e.getMessage());
+        }
     }
 }
