@@ -1,23 +1,31 @@
 package com.SpringAI.RAG.controller;
 
+import com.SpringAI.RAG.dto.WebDataRequest;
 import com.SpringAI.RAG.service.ChatService;
+import com.SpringAI.RAG.service.WebDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/chat")
 public class ChatController {
 
     private final ChatService chatService;
+    private final WebDataService webDataService;
 
-    public ChatController(ChatService chatService) {
+    public ChatController(ChatService chatService, WebDataService webDataService) {
         this.chatService = chatService;
+        this.webDataService = webDataService;
     }
 
-    @PostMapping("/initialize/vector_store")
+    @PostMapping("/pdfStore")
     @Operation(summary = "Initialize the vector store with PDF data", description = "Uploads a PDF file and processes it into the vector store.")
     public ResponseEntity<String> initializeVectorStore(
             @Parameter(description = "PDF file resource to upload") @RequestParam("file") MultipartFile file) {
@@ -38,5 +46,20 @@ public class ChatController {
     public ResponseEntity<String> generateCode(@RequestBody String prompt) {
         String code = chatService.codeGeneratorBot(prompt);
         return ResponseEntity.ok(code);
+    }
+
+    @PostMapping("/CrawlStore")
+    @Operation(summary = "Crawl a website and store content", description = "Crawl a website and store the extracted content")
+    public ResponseEntity<String> crawlAndStoreContent(@RequestBody WebDataRequest request) throws IOException {
+        List<String> contentList = webDataService.crawlAndExtractContent(request.getUrl());
+        webDataService.storeContent(contentList);
+        return ResponseEntity.ok("Content crawled and stored successfully.");
+    }
+
+    @PostMapping("/QueryContent")
+    @Operation(summary = "Search for relevant content based on the query", description = "Search for content in the stored data and provide a relevant response")
+    public ResponseEntity<String> queryContent(@RequestBody WebDataRequest request) {
+        String response = webDataService.queryContent(request.getQuery());
+        return ResponseEntity.ok(response);
     }
 }

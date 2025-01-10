@@ -56,7 +56,11 @@
 			<artifactId>spring-ai-pgvector-store-spring-boot-starter</artifactId>
 			<version>${spring-ai.version}</version>
 		</dependency>
-
+		<dependency>
+			<groupId>org.jsoup</groupId>
+			<artifactId>jsoup</artifactId>
+			<version>1.16.1</version>
+		</dependency>
 		<dependency>
 			<groupId>org.springframework.retry</groupId>
 			<artifactId>spring-retry</artifactId>
