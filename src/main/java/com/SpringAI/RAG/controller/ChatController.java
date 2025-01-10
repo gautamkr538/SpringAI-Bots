@@ -39,7 +39,7 @@ public class ChatController {
     }
 
     @PostMapping("/CodeBot")
-    @Operation(summary = "Query the chatbot for code", description = "Send a prompt to the chatbot to generate code")
+    @Operation(summary = "Query the chatbot to generate code", description = "Send a prompt to the chatbot to generate code")
     public ResponseEntity<String> generateCode(@RequestBody String prompt) {
         try {
             String code = chatService.codeGeneratorBot(prompt);
