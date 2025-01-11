@@ -170,6 +170,7 @@ public class WebDataService {
             String documents = similarDocuments.stream()
                     .map(Document::getContent)
                     .collect(Collectors.joining("\n"));
+            log.info("Found {} similar content items for the query.", documents.length());
             String template = """
             Based on the DOCUMENTS below, respond to the QUERY.
             If the answer is not available, state: "The data is not available in the provided document."
