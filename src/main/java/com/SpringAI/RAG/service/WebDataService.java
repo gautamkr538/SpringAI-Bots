@@ -97,8 +97,8 @@ public class WebDataService {
     private void extractSpecialContent(String text, Set<String> extractedContent, org.jsoup.nodes.Document doc) {
         String githubPattern = "https://(www\\.)?github\\.com/([a-zA-Z0-9_-]+)";
         String linkedinPattern = "https://(www\\.)?linkedin\\.com/in/([a-zA-Z0-9_-]+)";
-        extractPhoneNumbers(text, extractedContent);  // Extract phone numbers
-        extractEmails(text, extractedContent);  // Extract email addresses
+        extractPhoneNumbers(text, extractedContent);
+        extractEmails(text, extractedContent);
 
         // Extract and add GitHub links to content
         Elements githubLinks = doc.select("a[href~=" + githubPattern + "]");
@@ -167,7 +167,9 @@ public class WebDataService {
             Document queryDocument = new Document(query);
             List<Document> similarDocuments = vectorStore.similaritySearch(String.valueOf(queryDocument));
             // Format documents for prompt and send to ChatGPT for response
-            String documents = similarDocuments.stream().map(Document::getContent).collect(Collectors.joining("\n"));
+            String documents = similarDocuments.stream()
+                    .map(Document::getContent)
+                    .collect(Collectors.joining("\n"));
             String template = """
             Based on the DOCUMENTS below, respond to the QUERY.
             If the answer is not available, state: "The data is not available in the provided document."
@@ -178,10 +180,12 @@ public class WebDataService {
             QUERY:
             {query}
             """;
-            String formattedPrompt = template.replace("{documents}", documents).replace("{query}", query);  // Format the prompt for ChatGPT
+            // Format the prompt for ChatGPT
+            String formattedPrompt = template.replace("{documents}", documents).replace("{query}", query);
             SystemMessage systemMessage = new SystemMessage(formattedPrompt);
             UserMessage userMessage = new UserMessage(query);
             Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
+            // Get response from the chat client
             return chatClient.prompt(prompt).call().content();
         } catch (Exception e) {
             log.error("Error occurred while processing the query: {}", e.getMessage(), e);

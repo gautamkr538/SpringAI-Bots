@@ -92,6 +92,7 @@ public class ChatServiceImpl implements ChatService {
                 DOCUMENTS:
                 {documents}
                 """;
+            // Format the prompt for ChatGPT
             SystemMessage systemMessage = new SystemMessage(template.replace("{documents}", documents));
             UserMessage userMessage = new UserMessage(question);
             Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
