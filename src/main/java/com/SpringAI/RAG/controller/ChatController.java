@@ -25,7 +25,7 @@ public class ChatController {
     }
 
     @PostMapping("/pdfStore")
-    @Operation(summary = "Initialize the vector store with PDF data",
+    @Operation(summary = "Initialize the vector_store with PDF data",
             description = "Uploads a PDF file and processes it into the vector store.")
     public ResponseEntity<String> initializeVectorStore(
             @Parameter(description = "PDF file resource to upload") @RequestParam("file") MultipartFile file) {
@@ -59,7 +59,7 @@ public class ChatController {
     }
 
     @PostMapping("/query/webContent")
-    @Operation(summary = "Search for relevant content based on the query",
+    @Operation(summary = "Search for relevant content in vector_store based on the query",
             description = "Search for content in the stored data and provide a relevant response")
     public ResponseEntity<String> queryContent(@RequestBody WebDataRequest request) {
         String response = webDataService.queryContent(request.getQuery());
