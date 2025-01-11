@@ -5,7 +5,6 @@ import com.SpringAI.RAG.service.ChatService;
 import com.SpringAI.RAG.service.WebDataService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,7 +25,8 @@ public class ChatController {
     }
 
     @PostMapping("/pdfStore")
-    @Operation(summary = "Initialize the vector store with PDF data", description = "Uploads a PDF file and processes it into the vector store.")
+    @Operation(summary = "Initialize the vector store with PDF data",
+            description = "Uploads a PDF file and processes it into the vector store.")
     public ResponseEntity<String> initializeVectorStore(
             @Parameter(description = "PDF file resource to upload") @RequestParam("file") MultipartFile file) {
         chatService.initializeVectorStore(file);
@@ -42,14 +42,16 @@ public class ChatController {
     }
 
     @PostMapping("/codeBot")
-    @Operation(summary = "Query the codeBot to generate code", description = "Send a prompt to the chatbot to generate code")
+    @Operation(summary = "Query the codeBot to generate code",
+            description = "Send a prompt to the chatbot to generate code")
     public ResponseEntity<String> generateCode(@RequestBody String prompt) {
         String code = chatService.codeGeneratorBot(prompt);
         return ResponseEntity.ok(code);
     }
 
     @PostMapping("/crawlWeb/store")
-    @Operation(summary = "Crawl a website and store content", description = "Crawl a website and store the extracted content")
+    @Operation(summary = "Crawl a website and store content in vector_store",
+            description = "Crawl a website and store the extracted content")
     public ResponseEntity<String> crawlAndStoreContent(@RequestBody WebDataRequest request) throws IOException {
         List<String> contentList = webDataService.crawlAndExtractContent(request.getUrl());
         webDataService.storeContent(contentList);
@@ -57,7 +59,8 @@ public class ChatController {
     }
 
     @PostMapping("/query/webContent")
-    @Operation(summary = "Search for relevant content based on the query", description = "Search for content in the stored data and provide a relevant response")
+    @Operation(summary = "Search for relevant content based on the query",
+            description = "Search for content in the stored data and provide a relevant response")
     public ResponseEntity<String> queryContent(@RequestBody WebDataRequest request) {
         String response = webDataService.queryContent(request.getQuery());
         return ResponseEntity.ok(response);

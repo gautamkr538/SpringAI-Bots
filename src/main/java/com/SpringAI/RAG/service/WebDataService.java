@@ -14,7 +14,6 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -36,14 +35,14 @@ public class WebDataService {
         this.chatClient = chatClientBuilder.build();
     }
 
-    public List<String> crawlAndExtractContent(String url) throws IOException {
+    public List<String> crawlAndExtractContent(String url) {
         Set<String> visitedLinks = new HashSet<>();
         Set<String> extractedContent = new HashSet<>();
         crawlAndExtractHelper(url, visitedLinks, extractedContent);
         return new ArrayList<>(extractedContent);
     }
 
-    private void crawlAndExtractHelper(String url, Set<String> visitedLinks, Set<String> extractedContent) throws IOException {
+    private void crawlAndExtractHelper(String url, Set<String> visitedLinks, Set<String> extractedContent) {
         if (visitedLinks.contains(url)) {
             return;
         }
@@ -53,15 +52,18 @@ public class WebDataService {
             String textContent = doc.body().text();
             log.info("Extracted Content: {}", textContent);
             extractedContent.add(textContent);
-
             Elements links = doc.select("a[href]");
             for (Element link : links) {
                 String nextLink = link.absUrl("href");
                 // Ensure valid and non-visited link
                 if (nextLink.startsWith("http://") || nextLink.startsWith("https://")) {
-                    crawlAndExtractHelper(nextLink, visitedLinks, extractedContent);
+                        crawlAndExtractHelper(nextLink, visitedLinks, extractedContent);
                 }
             }
+        } catch (org.jsoup.HttpStatusException e) {
+            log.warn("HTTP error while crawling URL: {}. Status: {}. Skipping...", url, e.getStatusCode());
+        } catch (org.jsoup.UnsupportedMimeTypeException e) {
+            log.warn("Unsupported MIME type for URL: {}. Skipping...", url);
         } catch (Exception e) {
             log.error("Error while crawling URL: {}", url, e);
         }
