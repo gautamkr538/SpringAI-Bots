@@ -61,11 +61,11 @@ public class WebDataService {
                 }
             }
         } catch (org.jsoup.HttpStatusException e) {
-            log.warn("HTTP error while crawling URL: {}. Status: {}. Skipping...", url, e.getStatusCode());
+            log.warn("HTTP error while crawling URL: {}. message: {}. Skipping...", url, e.getMessage());
         } catch (org.jsoup.UnsupportedMimeTypeException e) {
             log.warn("Unsupported MIME type for URL: {}. Skipping...", url);
         } catch (Exception e) {
-            log.error("Error while crawling URL: {}", url, e);
+            log.error("Error while crawling URL: {} message: {}", url, e.getMessage());
         }
     }
 
