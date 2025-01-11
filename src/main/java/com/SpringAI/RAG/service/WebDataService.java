@@ -149,21 +149,21 @@ public class WebDataService {
             for (int i = 0; i < contentList.size(); i++) {
                 batchDocuments.add(new Document(contentList.get(i)));
                 if (batchDocuments.size() >= batchSize || i == contentList.size() - 1) {
-                    log.info("Storing {} content items into the vector database.", batchDocuments.size());
+                    log.info("Storing {} content items into the vector_store.", batchDocuments.size());
                     vectorStore.add(batchDocuments);
                     batchDocuments.clear();
                 }
             }
-            log.info("Successfully stored content into the vector database.");
+            log.info("Successfully stored content into the vector_store.");
         } catch (Exception e) {
-            log.error("Error occurred while storing content into the vector database: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to store content into the vector database.", e);
+            log.error("Error occurred while storing content into the vector_store: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to store content into the vector_store.", e);
         }
     }
 
     public String queryContent(String query) {
         try {
-            log.info("Searching for similar content in the vector database for query: {}", query);
+            log.info("Searching for similar content in the vector_store for query: {}", query);
             Document queryDocument = new Document(query);
             List<Document> similarDocuments = vectorStore.similaritySearch(String.valueOf(queryDocument));
             // Format documents for prompt and send to ChatGPT for response

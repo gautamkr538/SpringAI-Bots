@@ -68,7 +68,7 @@ public class ChatServiceImpl implements ChatService {
             throw new RuntimeException("File not found", e);
         } catch (Exception e) {
             log.error("Unexpected error during vector store initialization", e);
-            throw new RuntimeException("Unexpected error during vector store initialization", e);
+            throw new RuntimeException("Unexpected error during vector_store initialization", e);
         }
     }
 
