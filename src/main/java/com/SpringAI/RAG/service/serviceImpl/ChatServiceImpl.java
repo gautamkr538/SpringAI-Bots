@@ -48,9 +48,7 @@ public class ChatServiceImpl implements ChatService {
     public void initializeVectorStore(MultipartFile file) {
         try {
             log.info("Starting vector store initialization");
-            // Clear existing data in the vector_store database
             jdbcTemplate.update("delete from vector_store");
-            // Read the uploaded PDF file
             Resource resource = new InputStreamResource(file.getInputStream());
             // Configure PDF reader to process the file
             PdfDocumentReaderConfig config = PdfDocumentReaderConfig.builder()
@@ -78,10 +76,12 @@ public class ChatServiceImpl implements ChatService {
     public String chatBot(String question) {
         log.info("Received query: {}", question);
         try {
+            // Search for documents related to the user's query
             List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
             String documents = similarDocuments.stream()
                     .map(Document::getContent)
                     .collect(Collectors.joining(System.lineSeparator()));
+            // Prepare prompt with documents and question
             String template = """
                 If the information is available in the DOCUMENTS,
                 respond with the relevant details as if you innately knew them.
@@ -95,6 +95,7 @@ public class ChatServiceImpl implements ChatService {
             SystemMessage systemMessage = new SystemMessage(template.replace("{documents}", documents));
             UserMessage userMessage = new UserMessage(question);
             Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
+            // Get response from the chat client
             String response = chatClient.prompt(prompt).call().content();
             log.info("Response generated: {}", response);
             return response;
@@ -108,6 +109,7 @@ public class ChatServiceImpl implements ChatService {
     public String codeGeneratorBot(String prompt) {
         log.info("Received code generation prompt: {}", prompt);
         try {
+            // Prepare prompt for code generation
             String template = """
                 Based on the provided prompt, generate the corresponding code without extra spacing.
                 If the prompt is not asking for code generation, clearly state:
@@ -118,6 +120,7 @@ public class ChatServiceImpl implements ChatService {
             SystemMessage systemMessage = new SystemMessage(template.replace("{prompt}", prompt));
             UserMessage userMessage = new UserMessage(prompt);
             Prompt codePrompt = new Prompt(List.of(systemMessage, userMessage));
+            // Get generated code from the chat client
             String generatedCode = chatClient.prompt(codePrompt).call().content();
             log.info("Generated code: {}", generatedCode);
             return generatedCode;
