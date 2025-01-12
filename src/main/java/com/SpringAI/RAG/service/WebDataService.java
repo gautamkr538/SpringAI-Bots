@@ -93,43 +93,44 @@ public class WebDataService {
         }
     }
 
-    // Extract special content like GitHub, LinkedIn links, phone numbers, and emails
     private void extractSpecialContent(String text, Set<String> extractedContent, org.jsoup.nodes.Document doc) {
-        String githubPattern = "https://(www\\.)?github\\.com/([a-zA-Z0-9_-]+)";
-        String linkedinPattern = "https://(www\\.)?linkedin\\.com/in/([a-zA-Z0-9_-]+)";
+        // GitHub URL pattern (both http and https, with optional query params)
+        String githubPattern = "https?://(www\\.)?github\\.com/[a-zA-Z0-9_-]+(/[a-zA-Z0-9._-]+)*(\\?[a-zA-Z0-9=&%]+)?";
+        // LinkedIn URL pattern (both http and https, including company and personal profiles)
+        String linkedinPattern = "https?://(www\\.)?linkedin\\.com/(in/[a-zA-Z0-9_-]+(/[a-zA-Z0-9._-]+)*)|(company/[a-zA-Z0-9_-]+(/[a-zA-Z0-9._-]+)*)";
+        // Extract phone numbers and emails from the text
         extractPhoneNumbers(text, extractedContent);
         extractEmails(text, extractedContent);
-
-        // Extract and add GitHub links to content
-        Elements githubLinks = doc.select("a[href~=" + githubPattern + "]");
-        for (Element link : githubLinks) {
-            extractedContent.add("GitHub link: " + link.attr("href"));
-        }
-        // Extract and add LinkedIn links to content
-        Elements linkedinLinks = doc.select("a[href~=" + linkedinPattern + "]");
-        for (Element link : linkedinLinks) {
-            extractedContent.add("LinkedIn link: " + link.attr("href"));
+        Elements links = doc.select("a[href]");
+        for (Element link : links) {
+            String href = link.attr("href");
+            if (href.matches(githubPattern)) {
+                extractedContent.add("GitHub link: " + href);
+            }
+            else if (href.matches(linkedinPattern)) {
+                extractedContent.add("LinkedIn link: " + href);
+            }
         }
     }
 
+    // Method to skip URLs that point to media files (images, videos, audio, etc.)
     private boolean shouldSkipUrl(String url) {
-        // Skip if the URL is pointing to email, GitHub, LinkedIn, media files (image/video/audio)
-        return url.matches("^(mailto:|.*(github|linkedin)\\.com.*)$") ||
-                url.matches(".*\\.(jpg|jpeg|png|gif|bmp|mp4|webm|mp3|wav|ogg|flac|avi|mov|wmv|mkv)$");
+        return url.matches(".*\\.(jpg|jpeg|png|gif|bmp|mp4|webm|mp3|wav|ogg|flac|avi|mov|wmv|mkv|pdf|docx|pptx)$");
     }
 
-    // Extract phone numbers from the text
+    // Method to extract phone numbers from the text
     private void extractPhoneNumbers(String text, Set<String> extractedContent) {
-        Pattern phonePattern = Pattern.compile("(\\+\\d{1,2}\\s?)?\\(?\\d{3}\\)?\\s?\\d{3}-?\\d{4}");
+        // Enhanced phone number pattern (supports international formats, extensions, etc.)
+        Pattern phonePattern = Pattern.compile("(\\+\\d{1,3}[-.\\s]?)?(\\(?\\d{1,4}\\)?[-.\\s]?)?(\\d{1,4}[-.\\s]?){1,3}\\d{1,4}(\\s?x\\d+)?");
         Matcher phoneMatcher = phonePattern.matcher(text);
         while (phoneMatcher.find()) {
             extractedContent.add("Phone number: " + phoneMatcher.group());
         }
     }
 
-    // Extract email addresses from the text
+    // Method to extract emails from the text
     private void extractEmails(String text, Set<String> extractedContent) {
-        Pattern emailPattern = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}");
+        Pattern emailPattern = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(\\.[a-zA-Z]{2,})?");
         Matcher emailMatcher = emailPattern.matcher(text);
         while (emailMatcher.find()) {
             extractedContent.add("Email: " + emailMatcher.group());
