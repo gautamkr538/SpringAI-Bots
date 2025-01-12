@@ -22,7 +22,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.FileNotFoundException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -59,18 +62,37 @@ public class ChatServiceImpl implements ChatService {
                     .withPagesPerDocument(1)
                     .build();
             PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource, config);
+            List<Document> textContent = pdfReader.get();
+//            // Detect URLs in the extracted text
+//            List<Document> enhancedContent = textContent.stream()
+//                    .map(document -> {
+//                        String content = document.getContent();
+//                        List<String> urls = extractUrls(content);
+//                        // Append URLs to the content
+//                        if (!urls.isEmpty()) {
+//                            content += "\nExtracted URLs:\n" + String.join("\n", urls);
+//                        }
+//                        return new Document(content);
+//                    }).toList();
             // Split extracted text into tokens and store in vector_store
             TokenTextSplitter textSplitter = new TokenTextSplitter();
-            vectorStore.accept(textSplitter.apply(pdfReader.get()));
+            vectorStore.accept(textSplitter.apply(textContent));
             log.info("Vector store initialized successfully");
-        } catch (FileNotFoundException e) {
-            log.error("File not found: ", e);
-            throw new RuntimeException("File not found", e);
         } catch (Exception e) {
             log.error("Unexpected error during vector store initialization", e);
             throw new RuntimeException("Unexpected error during vector_store initialization", e);
         }
     }
+
+//    private List<String> extractUrls(String text) {
+//        List<String> urls = new ArrayList<>();
+//        String urlRegex = "(https?://[\\w\\-._~:/?\\[\\]@!$&'()*+,;=%]+)";
+//        Matcher matcher = Pattern.compile(urlRegex).matcher(text);
+//        while (matcher.find()) {
+//            urls.add(matcher.group());
+//        }
+//        return urls;
+//    }
 
     @Override
     public String chatBot(String question) {
