@@ -1,5 +1,6 @@
 package com.SpringAI.RAG.service.serviceImpl;
 
+import com.SpringAI.RAG.exception.ChatServiceException;
 import com.SpringAI.RAG.service.ChatService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
@@ -21,7 +22,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
@@ -81,7 +81,7 @@ public class ChatServiceImpl implements ChatService {
             log.info("Vector store initialized successfully");
         } catch (Exception e) {
             log.error("Unexpected error during vector store initialization", e);
-            throw new RuntimeException("Unexpected error during vector_store initialization", e);
+            throw new ChatServiceException("Unexpected error during vector store initialization", e);
         }
     }
 
@@ -124,8 +124,8 @@ public class ChatServiceImpl implements ChatService {
             log.info("Response generated: {}", response);
             return response;
         } catch (Exception e) {
-            log.error("Error processing the chatbot query: ", e);
-            return "An error occurred while processing the query. Please try again later.";
+            log.error("Unexpected error during vector store initialization", e);
+            throw new ChatServiceException("Unexpected error during vector store initialization", e);
         }
     }
 
@@ -149,8 +149,8 @@ public class ChatServiceImpl implements ChatService {
             log.info("Generated code: {}", generatedCode);
             return generatedCode;
         } catch (Exception e) {
-            log.error("Error generating code: ", e);
-            return "An error occurred while generating the code. Please try again later.";
+            log.error("Unexpected error during vector store initialization", e);
+            throw new ChatServiceException("Unexpected error during vector store initialization", e);
         }
     }
 }
