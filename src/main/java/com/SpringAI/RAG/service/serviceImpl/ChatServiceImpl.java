@@ -57,7 +57,8 @@ public class ChatServiceImpl implements ChatService {
             PdfDocumentReaderConfig config = PdfDocumentReaderConfig.builder()
                     .withPageExtractedTextFormatter(new ExtractedTextFormatter.Builder()
                             .withNumberOfBottomTextLinesToDelete(3)
-                            .withNumberOfTopPagesToSkipBeforeDelete(1)
+                            .withNumberOfTopTextLinesToDelete(3)
+//                            .withNumberOfTopPagesToSkipBeforeDelete(0)
                             .build())
                     .withPagesPerDocument(1)
                     .build();
