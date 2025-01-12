@@ -1,10 +1,10 @@
 package com.SpringAI.RAG.service;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -14,10 +14,8 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
+import java.util.concurrent.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -26,101 +24,98 @@ import java.util.stream.Collectors;
 public class WebDataService {
 
     private static final Logger log = LoggerFactory.getLogger(WebDataService.class);
+    private static final int MAX_CRAWL_DEPTH = 3;
+    private static final int RETRY_LIMIT = 3;
+    private static final int THREAD_POOL_SIZE = 10;
 
     private final VectorStore vectorStore;
     private final JdbcTemplate jdbcTemplate;
     private final ChatClient chatClient;
+    private final ExecutorService executorService;
 
     public WebDataService(VectorStore vectorStore, JdbcTemplate jdbcTemplate, ChatClient.Builder chatClientBuilder) {
         this.vectorStore = vectorStore;
         this.jdbcTemplate = jdbcTemplate;
         this.chatClient = chatClientBuilder.build();
+        this.executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
     }
 
-    // Crawl and extract content from the provided URL
     public List<String> crawlAndExtractContent(String url) {
-        Set<String> visitedLinks = new HashSet<>();
-        Set<String> extractedContent = new HashSet<>();
-        crawlAndExtractHelper(url, visitedLinks, extractedContent);
+        Set<String> visitedLinks = ConcurrentHashMap.newKeySet();
+        Set<String> extractedContent = ConcurrentHashMap.newKeySet();
+        Queue<Future<?>> tasks = new LinkedList<>();
+        tasks.add(submitCrawlTask(url, visitedLinks, extractedContent, 0));
+        awaitCompletion(tasks);
+        executorService.shutdown();
         return new ArrayList<>(extractedContent);
     }
 
-    // Helper method for crawling and extracting content from the URL
-    private void crawlAndExtractHelper(String url, Set<String> visitedLinks, Set<String> extractedContent) {
-        if (visitedLinks.contains(url)) {
+    private Future<?> submitCrawlTask(String url, Set<String> visitedLinks, Set<String> extractedContent, int depth) {
+        return executorService.submit(() -> crawlAndExtractHelper(url, visitedLinks, extractedContent, depth));
+    }
+
+    private void crawlAndExtractHelper(String url, Set<String> visitedLinks, Set<String> extractedContent, int depth) {
+        if (visitedLinks.contains(url) || depth >= MAX_CRAWL_DEPTH || !isValidUrl(url)) {
             return;
         }
         visitedLinks.add(url);
-        // Skip URLs that match certain patterns
         if (shouldSkipUrl(url)) {
-            log.info("Skipping URL: {} because it matches an excluded domain or media type.", url);
-            extractedContent.add(url);
+            log.info("Skipping URL: {}", url);
             return;
         }
         try {
-            // Parse the content of the URL using Jsoup
-            org.jsoup.nodes.Document doc = Jsoup.connect(url)
-                    .timeout(10000)
-                    .userAgent("Mozilla/5.0")
-                    .execute()
-                    .parse();
-            String bodyText = doc.body().text();
-            extractSpecialContent(bodyText, extractedContent, doc);
-            // Add body text to the extracted content
-            if (!bodyText.isEmpty()) {
-                log.info("Extracted Content: {}", bodyText);
-                extractedContent.add(bodyText);
+            String pageContent = fetchPageContent(url);
+            if (pageContent == null) {
+                return;
             }
-            // Extract and crawl links from the page
+            org.jsoup.nodes.Document doc = Jsoup.parse(pageContent, url);
+            aggregateContent(doc, extractedContent);
+            extractSpecialContent(pageContent, extractedContent, doc);
+
             Elements links = doc.select("a[href]");
             for (Element link : links) {
                 String nextLink = link.absUrl("href");
-                // Recursively crawl valid links
-                if ((nextLink.startsWith("http://") || nextLink.startsWith("https://")) && !visitedLinks.contains(nextLink)) {
-                    crawlAndExtractHelper(nextLink, visitedLinks, extractedContent);
+                if (isValidUrl(nextLink) && !visitedLinks.contains(nextLink)) {
+                    submitCrawlTask(nextLink, visitedLinks, extractedContent, depth + 1);
                 }
             }
-        }
-        catch (org.jsoup.HttpStatusException e) {
-            log.warn("HTTP error (Status Code: {}) while crawling URL: {}. Message: {}. Skipping...", e.getStatusCode(), url, e.getMessage());
-            extractedContent.add(url);
-        } catch (org.jsoup.UnsupportedMimeTypeException e) {
-            log.warn("Unsupported MIME type for URL: {}. Skipping...", url);
-            extractedContent.add(url);
         } catch (Exception e) {
             log.error("Error while crawling URL: {}. Message: {}", url, e.getMessage());
-            extractedContent.add(url);
         }
     }
 
+    private boolean shouldSkipUrl(String url) {
+        return url.matches(".*\\.(jpg|jpeg|png|gif|bmp|mp4|webm|mp3|wav|ogg|flac|avi|mov|wmv|mkv|pdf|docx|pptx|xlsx)$");
+    }
+
     private void extractSpecialContent(String text, Set<String> extractedContent, org.jsoup.nodes.Document doc) {
-        // GitHub URL pattern (both http and https, with optional query params)
         String githubPattern = "https?://(www\\.)?github\\.com/[a-zA-Z0-9_-]+(/[a-zA-Z0-9._-]+)*(\\?[a-zA-Z0-9=&%]+)?";
-        // LinkedIn URL pattern (both http and https, including company and personal profiles)
         String linkedinPattern = "https?://(www\\.)?linkedin\\.com/(in/[a-zA-Z0-9_-]+(/[a-zA-Z0-9._-]+)*)|(company/[a-zA-Z0-9_-]+(/[a-zA-Z0-9._-]+)*)";
+        String socialMediaPattern = "https?://(www\\.)?(facebook|twitter|instagram|pinterest)\\.com/[a-zA-Z0-9_-]+";
+        String jobPostingPattern = "https?://(www\\.)?linkedin\\.com/jobs/view/\\d+";
+        String academicPattern = "https?://(www\\.)?researchgate\\.net/publication/\\d+";
         // Extract phone numbers and emails from the text
         extractPhoneNumbers(text, extractedContent);
         extractEmails(text, extractedContent);
+        // Extract specific types of links
         Elements links = doc.select("a[href]");
         for (Element link : links) {
             String href = link.attr("href");
             if (href.matches(githubPattern)) {
                 extractedContent.add("GitHub link: " + href);
-            }
-            else if (href.matches(linkedinPattern)) {
+            } else if (href.matches(linkedinPattern)) {
                 extractedContent.add("LinkedIn link: " + href);
+            } else if (href.matches(socialMediaPattern)) {
+                extractedContent.add("Social Media link: " + href);
+            } else if (href.matches(jobPostingPattern)) {
+                extractedContent.add("Job Posting: " + href);
+            } else if (href.matches(academicPattern)) {
+                extractedContent.add("Academic Publication: " + href);
             }
         }
     }
 
-    // Method to skip URLs that point to media files (images, videos, audio, etc.)
-    private boolean shouldSkipUrl(String url) {
-        return url.matches(".*\\.(jpg|jpeg|png|gif|bmp|mp4|webm|mp3|wav|ogg|flac|avi|mov|wmv|mkv|pdf|docx|pptx)$");
-    }
-
-    // Method to extract phone numbers from the text
     private void extractPhoneNumbers(String text, Set<String> extractedContent) {
-        // Enhanced phone number pattern (supports international formats, extensions, etc.)
         Pattern phonePattern = Pattern.compile("(\\+\\d{1,3}[-.\\s]?)?(\\(?\\d{1,4}\\)?[-.\\s]?)?(\\d{1,4}[-.\\s]?){1,3}\\d{1,4}(\\s?x\\d+)?");
         Matcher phoneMatcher = phonePattern.matcher(text);
         while (phoneMatcher.find()) {
@@ -128,7 +123,6 @@ public class WebDataService {
         }
     }
 
-    // Method to extract emails from the text
     private void extractEmails(String text, Set<String> extractedContent) {
         Pattern emailPattern = Pattern.compile("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}(\\.[a-zA-Z]{2,})?");
         Matcher emailMatcher = emailPattern.matcher(text);
@@ -137,7 +131,63 @@ public class WebDataService {
         }
     }
 
-    // Store the extracted content into the vector database
+    private void aggregateContent(org.jsoup.nodes.Document doc, Set<String> extractedContent) {
+        Elements headers = doc.select("h1, h2, h3");
+        for (Element header : headers) {
+            String section = header.text();
+            String content = extractSectionContent(header);
+            if (!content.isEmpty()) {
+                log.info("Extracted Section: {} - {}", section, content);
+                extractedContent.add(section + ":\n" + content);
+            }
+        }
+    }
+
+    private String extractSectionContent(Element header) {
+        StringBuilder sectionContent = new StringBuilder();
+        Element sibling = header.nextElementSibling();
+
+        while (sibling != null && !sibling.tagName().matches("h1|h2|h3")) {
+            sectionContent.append(sibling.text()).append("\n");
+            sibling = sibling.nextElementSibling();
+        }
+        return sectionContent.toString().trim();
+    }
+
+    private boolean isValidUrl(String url) {
+        return url != null && !url.isEmpty() && (url.startsWith("http://") || url.startsWith("https://"));
+    }
+
+    private String fetchPageContent(String url) {
+        int attempts = 0;
+        while (attempts < RETRY_LIMIT) {
+            try {
+                org.jsoup.nodes.Document doc = Jsoup.connect(url)
+                        .timeout(10000)
+                        .userAgent("Mozilla/5.0")
+                        .get();
+                return doc.outerHtml();
+            } catch (Exception e) {
+                attempts++;
+                log.warn("Attempt {} to fetch URL failed: {}. Error: {}", attempts, url, e.getMessage());
+            }
+        }
+        return null;
+    }
+
+    private void awaitCompletion(Queue<Future<?>> tasks) {
+        while (!tasks.isEmpty()) {
+            try {
+                Future<?> task = tasks.poll();
+                if (task != null) {
+                    task.get();
+                }
+            } catch (InterruptedException | ExecutionException e) {
+                log.error("Error while waiting for task completion: {}", e.getMessage());
+            }
+        }
+    }
+
     public void storeContent(List<String> contentList) {
         if (contentList == null || contentList.isEmpty()) {
             log.warn("Received an empty content list for storage.");
@@ -164,34 +214,28 @@ public class WebDataService {
 
     public String queryContent(String query) {
         try {
-            log.info("Searching for similar content in the vector_store for query: {}", query);
-            Document queryDocument = new Document(query);
-            List<Document> similarDocuments = vectorStore.similaritySearch(String.valueOf(queryDocument));
-            // Format documents for prompt and send to ChatGPT for response
+            List<Document> similarDocuments = vectorStore.similaritySearch(query);
+            if (similarDocuments.isEmpty()) {
+                return "No similar content found in the vector store.";
+            }
             String documents = similarDocuments.stream()
                     .map(Document::getContent)
                     .collect(Collectors.joining("\n"));
-            log.info("Found {} similar content items for the query.", documents.length());
-            String template = """
-            Based on the DOCUMENTS below, respond to the QUERY.
-            If the answer is not available, state: "The data is not available in the provided document."
+            String prompt = """
+                    Based on the DOCUMENTS below, respond to the QUERY.
+                    If the answer is not available, state: "The data is not available in the provided document."
 
-            DOCUMENTS:
-            {documents}
+                    DOCUMENTS:
+                    {documents}
 
-            QUERY:
-            {query}
-            """;
-            // Format the prompt for ChatGPT
-            String formattedPrompt = template.replace("{documents}", documents).replace("{query}", query);
-            SystemMessage systemMessage = new SystemMessage(formattedPrompt);
-            UserMessage userMessage = new UserMessage(query);
-            Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
-            // Get response from the chat client
-            return chatClient.prompt(prompt).call().content();
+                    QUERY:
+                    {query}
+                    """.replace("{documents}", documents).replace("{query}", query);
+            Prompt chatPrompt = new Prompt(List.of(new SystemMessage(prompt), new UserMessage(query)));
+            return chatClient.prompt(chatPrompt).call().content();
         } catch (Exception e) {
-            log.error("Error occurred while processing the query: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to process the query.", e);
+            log.error("Error occurred while querying the content: {}", e.getMessage());
+            throw new RuntimeException("Failed to query the content.");
         }
     }
 }
