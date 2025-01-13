@@ -47,9 +47,9 @@ public class WebDataUtils {
                         .get();
                 return Optional.of(doc);
             } catch (IOException e) {
-                log.warn("Attempt {} failed for URL: {}", attempt, url, e);
+                log.warn("Attempt {} failed for URL: {}, Message: {}", attempt, url, e.getMessage());
                 if (attempt == maxRetries) {
-                    log.error("Max retries reached for URL: " + url, e);
+                    log.error("Max retries reached for URL: {}", url);
                     return Optional.empty();
                 }
                 try {
@@ -57,11 +57,11 @@ public class WebDataUtils {
                     Thread.sleep((long) Math.pow(2, attempt) * 1000);
                 } catch (InterruptedException interruptedException) {
                     Thread.currentThread().interrupt();
-                    log.error("Retry interrupted for URL: {}", url, interruptedException);
+                    log.error("Retry interrupted for URL: {}, Message:{}", url, interruptedException.getMessage());
                     break;
                 }
             } catch (Exception e) {
-                log.error("Unexpected error while fetching URL: {}. Message: {}", url, e.getMessage());
+                log.error("Unexpected error while fetching URL: {}, Message: {}", url, e.getMessage());
                 break;
             }
         }
@@ -77,7 +77,7 @@ public class WebDataUtils {
                 String content = extractSectionContent(header);
                 if (!content.isEmpty()) {
                     extractedContent.add(section + ":\n" + content);
-                    log.debug("Extracted content from section: " + section);
+                    log.info("Extracted content from section: {}", section);
                 }
             }
         } catch (Exception e) {
@@ -123,7 +123,7 @@ public class WebDataUtils {
                     .forEach(href -> linkPatterns.forEach((label, pattern) -> {
                         if (href.matches(pattern)) {
                             extractedContent.add(label + ": " + href);
-                            log.debug("Extracted link: " + label + ": " + href);
+                            log.info("Extracted link: " + label + ": " + href);
                         }
                     }));
         } catch (Exception e) {
@@ -131,13 +131,13 @@ public class WebDataUtils {
         }
     }
 
-    // Extracts content matching a specific pattern and logs the extraction
+    // Extracts content matching a pattern
     public static void extractWithPattern(String text, Pattern pattern, String label, Set<String> extractedContent) {
         try {
             var matcher = pattern.matcher(text);
             while (matcher.find()) {
                 extractedContent.add(label + ": " + matcher.group());
-                log.debug("Extracted " + label + ": " + matcher.group());
+                log.info("Extracted " + label + ": " + matcher.group());
             }
         } catch (Exception e) {
             log.error("Error while extracting content with pattern {}: {}", label, e.getMessage());

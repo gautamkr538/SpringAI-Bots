@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @Service
 public class WebDataServiceImpl implements WebDataService {
 
-    private static final Logger log = LoggerFactory.getLogger(WebDataService.class);
+    private static final Logger log = LoggerFactory.getLogger(WebDataServiceImpl.class);
     private static final int MAX_CRAWL_DEPTH = 3;
     private static final int RETRY_LIMIT = 3;
     private static final int THREAD_POOL_SIZE = 10;
