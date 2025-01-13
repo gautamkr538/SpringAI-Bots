@@ -14,6 +14,6 @@ public class SwaggerConfig {
                 .info(new Info()
                         .title("ChatBot for SpringAI-RAG")
                         .version("1.0")
-                        .description("Documentation for the ChatBot with OpenAI"));
+                        .description("Documentation for the SpringAI with OpenAI"));
     }
 }
