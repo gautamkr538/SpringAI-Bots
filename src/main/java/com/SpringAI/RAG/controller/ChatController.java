@@ -52,7 +52,7 @@ public class ChatController {
     @PostMapping("/crawlWeb/store")
     @Operation(summary = "Crawl a website and store content in vector_store",
             description = "Crawl a website and store the extracted content")
-    public ResponseEntity<String> crawlAndStoreContent(@RequestBody WebDataRequest request) throws IOException {
+    public ResponseEntity<String> crawlAndStoreContent(@RequestBody WebDataRequest request) throws  IOException {
         List<String> contentList = webDataService.crawlAndExtractContent(request.getUrl());
         webDataService.storeContent(contentList);
         return ResponseEntity.ok("Content crawled and stored successfully.");

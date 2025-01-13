@@ -105,7 +105,7 @@ public class WebDataServiceImpl implements WebDataService {
     public String fetchPageContent(String url) {
         try {
             return WebDataUtils.fetchUrlWithRetries(url, RETRY_LIMIT)
-                    .map(doc -> doc.outerHtml())
+                    .map(org.jsoup.nodes.Document::outerHtml)
                     .orElseThrow(() -> new CrawlException("Failed to fetch page content for URL: " + url, null));
         } catch (Exception e) {
             log.error("Error fetching page content: {}", e.getMessage());

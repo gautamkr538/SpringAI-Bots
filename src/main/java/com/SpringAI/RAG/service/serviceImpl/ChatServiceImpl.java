@@ -58,26 +58,26 @@ public class ChatServiceImpl implements ChatService {
                     .withPageExtractedTextFormatter(new ExtractedTextFormatter.Builder()
                             .withNumberOfBottomTextLinesToDelete(3)
                             .withNumberOfTopTextLinesToDelete(3)
-//                            .withNumberOfTopPagesToSkipBeforeDelete(0)
+                            .withNumberOfTopPagesToSkipBeforeDelete(0)
                             .build())
                     .withPagesPerDocument(1)
                     .build();
             PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource, config);
             List<Document> textContent = pdfReader.get();
-//            // Detect URLs in the extracted text
-//            List<Document> enhancedContent = textContent.stream()
-//                    .map(document -> {
-//                        String content = document.getContent();
-//                        List<String> urls = extractUrls(content);
-//                        // Append URLs to the content
-//                        if (!urls.isEmpty()) {
-//                            content += "\nExtracted URLs:\n" + String.join("\n", urls);
-//                        }
-//                        return new Document(content);
-//                    }).toList();
+            // Detect URLs in the extracted text
+            List<Document> enhancedContent = textContent.stream()
+                    .map(document -> {
+                        String content = document.getContent();
+                        List<String> urls = extractUrls(content);
+                        // Append URLs to the content
+                        if (!urls.isEmpty()) {
+                            content += "\nExtracted URLs:\n" + String.join("\n", urls);
+                        }
+                        return new Document(content);
+                    }).toList();
             // Split extracted text into tokens and store in vector_store
             TokenTextSplitter textSplitter = new TokenTextSplitter();
-            vectorStore.accept(textSplitter.apply(textContent));
+            vectorStore.accept(textSplitter.apply(enhancedContent));
             log.info("Vector store initialized successfully");
         } catch (Exception e) {
             log.error("Unexpected error during vector store initialization", e);
@@ -85,15 +85,15 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
-//    private List<String> extractUrls(String text) {
-//        List<String> urls = new ArrayList<>();
-//        String urlRegex = "(https?://[\\w\\-._~:/?\\[\\]@!$&'()*+,;=%]+)";
-//        Matcher matcher = Pattern.compile(urlRegex).matcher(text);
-//        while (matcher.find()) {
-//            urls.add(matcher.group());
-//        }
-//        return urls;
-//    }
+    private List<String> extractUrls(String text) {
+        List<String> urls = new ArrayList<>();
+        String urlRegex = "(https?://[\\w\\-._~:/?\\[\\]@!$&'()*+,;=%]+)";
+        Matcher matcher = Pattern.compile(urlRegex).matcher(text);
+        while (matcher.find()) {
+            urls.add(matcher.group());
+        }
+        return urls;
+    }
 
     @Override
     public String chatBot(String question) {
