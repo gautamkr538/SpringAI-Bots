@@ -81,8 +81,14 @@ public class WebDataServiceImpl implements WebDataService {
             return;
         }
         try {
-            String pageContent = fetchPageContent(url);
-            if (pageContent == null) {
+            String pageContent;
+            if (WebDataUtils.isJavaScriptHeavy(url)) {
+                log.info("JavaScript-heavy page detected: {}", url);
+                pageContent = WebDataUtils.processJavaScriptPage(url);
+            } else {
+                pageContent = fetchPageContent(url);
+            }
+            if (pageContent == null || pageContent.isEmpty()) {
                 return;
             }
             org.jsoup.nodes.Document doc = Jsoup.parse(pageContent, url);

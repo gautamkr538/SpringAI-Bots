@@ -1,10 +1,16 @@
 package com.SpringAI.RAG.utils;
 
+import io.github.bonigarcia.wdm.WebDriverManager;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import org.openqa.selenium.WebDriver;
+import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeOptions;
 
 import java.io.IOException;
 import java.util.*;
@@ -141,6 +147,42 @@ public class WebDataUtils {
             }
         } catch (Exception e) {
             log.error("Error while extracting content with pattern {}: {}", label, e.getMessage());
+        }
+    }
+
+    public static boolean isJavaScriptHeavy(String url) {
+        // Placeholder for more sophisticated JavaScript detection logic.
+        return url.contains("dynamic") || url.contains("javascript");
+    }
+
+    public static String processJavaScriptPage(String url) {
+        log.info("Processing JavaScript-heavy page: {}", url);
+        // Set up WebDriverManager
+        WebDriverManager.chromedriver().setup();
+        ChromeOptions options = new ChromeOptions();
+        options.addArguments("--headless", "--disable-gpu", "--no-sandbox");
+        WebDriver driver = null;
+        try {
+            driver = new ChromeDriver(options);
+            driver.get(url);
+            String pageSource = driver.getPageSource();
+            Document document = Jsoup.parse(pageSource);
+            // Aggregate meaningful content
+            Set<String> extractedContent = new HashSet<>();
+            aggregateContent(document, extractedContent);
+            // Combine extracted content into a single string
+            return String.join("\n\n", extractedContent);
+        } catch (Exception e) {
+            log.error("Error processing JavaScript-heavy page: {}", url, e);
+            return "";
+        } finally {
+            if (driver != null) {
+                try {
+                    driver.quit();
+                } catch (Exception e) {
+                    log.error("Error shutting down WebDriver for URL: {}", url, e);
+                }
+            }
         }
     }
 }
