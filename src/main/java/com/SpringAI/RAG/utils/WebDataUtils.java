@@ -150,11 +150,6 @@ public class WebDataUtils {
         }
     }
 
-    public static boolean isJavaScriptHeavy(String url) {
-        // Placeholder for more sophisticated JavaScript detection logic.
-        return url.contains("dynamic") || url.contains("javascript");
-    }
-
     public static String processJavaScriptPage(String url) {
         log.info("Processing JavaScript-heavy page: {}", url);
         // Set up WebDriverManager

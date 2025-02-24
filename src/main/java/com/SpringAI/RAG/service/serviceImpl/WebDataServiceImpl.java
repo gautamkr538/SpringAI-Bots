@@ -82,7 +82,7 @@ public class WebDataServiceImpl implements WebDataService {
         }
         try {
             String pageContent;
-            if (WebDataUtils.isJavaScriptHeavy(url)) {
+            if (url.contains("dynamic") || url.contains("javascript")) {
                 log.info("JavaScript-heavy page detected: {}", url);
                 pageContent = WebDataUtils.processJavaScriptPage(url);
             } else {
