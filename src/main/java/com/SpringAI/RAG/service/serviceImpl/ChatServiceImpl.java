@@ -18,6 +18,9 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -99,12 +102,11 @@ public class ChatServiceImpl implements ChatService {
     public String chatBot(String question) {
         log.info("Received query: {}", question);
         try {
-            // Search for documents related to the user's query
             List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
             String documents = similarDocuments.stream()
                     .map(Document::getContent)
                     .collect(Collectors.joining(System.lineSeparator()));
-            // Prepare prompt with documents and question
+            // Prepare prompt for code generation
             String template = """
                 If the information is available in the DOCUMENTS,
                 respond with the relevant details as if you innately knew them.
@@ -115,17 +117,26 @@ public class ChatServiceImpl implements ChatService {
                 DOCUMENTS:
                 {documents}
                 """;
-            // Format the prompt for ChatGPT
+
             SystemMessage systemMessage = new SystemMessage(template.replace("{documents}", documents));
             UserMessage userMessage = new UserMessage(question);
             Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
-            // Get response from the chat client
-            String response = chatClient.prompt(prompt).call().content();
-            log.info("Response generated: {}", response);
-            return response;
+            log.info("Prompt sent");
+            var result = chatClient.prompt(prompt).call();
+            if (result.content() == null) {
+                throw new ChatServiceException("OpenAI returned null or empty content");
+            }
+            log.info("OpenAI returned: {}", result.content());
+            return result.content();
+        } catch (HttpClientErrorException | HttpServerErrorException e) {
+            log.error("OpenAI HTTP error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new ChatServiceException("OpenAI API error: " + e.getStatusCode(), e);
+        } catch (RestClientException e) {
+            log.error("OpenAI call failed: {}", e.getMessage(), e);
+            throw new ChatServiceException("OpenAI API call failed. Try again later.", e);
         } catch (Exception e) {
-            log.error("Unexpected error during vector store initialization", e);
-            throw new ChatServiceException("Unexpected error during vector store initialization", e);
+            log.error("Unexpected error during chatbot response generation", e);
+            throw new ChatServiceException("Unexpected error during chatbot response generation", e);
         }
     }
 
@@ -138,19 +149,24 @@ public class ChatServiceImpl implements ChatService {
                 Based on the provided prompt, generate the corresponding code without extra spacing.
                 If the prompt is not asking for code generation, clearly state:
                 "This is the Code Generator Bot. Please use the ChatBot for any type of information."
-                
+    
+                PROMPT:
                 {prompt}
                 """;
-            SystemMessage systemMessage = new SystemMessage(template.replace("{prompt}", prompt));
+            String formattedPrompt = template.replace("{prompt}", prompt);
+            SystemMessage systemMessage = new SystemMessage(formattedPrompt);
             UserMessage userMessage = new UserMessage(prompt);
             Prompt codePrompt = new Prompt(List.of(systemMessage, userMessage));
-            // Get generated code from the chat client
+            log.info("Sending code generation prompt to ChatClient...");
             String generatedCode = chatClient.prompt(codePrompt).call().content();
+            if (generatedCode == null || generatedCode.trim().isEmpty()) {
+                throw new ChatServiceException("No response received from the Code Generator bot.");
+            }
             log.info("Generated code: {}", generatedCode);
             return generatedCode;
         } catch (Exception e) {
-            log.error("Unexpected error during vector store initialization", e);
-            throw new ChatServiceException("Unexpected error during vector store initialization", e);
+            log.error("Error during code generation", e);
+            throw new ChatServiceException("Unexpected error during code generation", e);
         }
     }
 }
