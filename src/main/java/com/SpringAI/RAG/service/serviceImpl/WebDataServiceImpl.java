@@ -3,6 +3,7 @@ package com.SpringAI.RAG.service.serviceImpl;
 import com.SpringAI.RAG.exception.CrawlException;
 import com.SpringAI.RAG.exception.ContentExtractionException;
 import com.SpringAI.RAG.exception.DatabaseException;
+import com.SpringAI.RAG.service.ChatService;
 import com.SpringAI.RAG.service.WebDataService;
 import com.SpringAI.RAG.utils.WebDataUtils;
 import org.jsoup.Jsoup;
@@ -37,11 +38,13 @@ public class WebDataServiceImpl implements WebDataService {
     private final ChatClient chatClient;
     private final ExecutorService executorService;
     private final Semaphore semaphore;
+    private final ChatService chatService;
 
-    public WebDataServiceImpl(VectorStore vectorStore, JdbcTemplate jdbcTemplate, ChatClient.Builder chatClientBuilder) {
+    public WebDataServiceImpl(VectorStore vectorStore, JdbcTemplate jdbcTemplate, ChatClient.Builder chatClientBuilder, ChatService chatService) {
         this.vectorStore = vectorStore;
         this.jdbcTemplate = jdbcTemplate;
         this.chatClient = chatClientBuilder.build();
+        this.chatService = chatService;
         this.executorService = Executors.newFixedThreadPool(THREAD_POOL_SIZE);
         this.semaphore = new Semaphore(THREAD_POOL_SIZE);
     }
@@ -179,7 +182,7 @@ public class WebDataServiceImpl implements WebDataService {
                 return "No similar content found in the vector store.";
             }
             String documents = similarDocuments.stream()
-                    .map(Document::getContent)
+                    .map(Document::getFormattedContent)
                     .collect(Collectors.joining("\n"));
             String prompt = """
                     Based on the DOCUMENTS below, respond to the QUERY.

@@ -122,12 +122,12 @@ public class ChatServiceImpl implements ChatService {
             UserMessage userMessage = new UserMessage(question);
             Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
             log.info("Prompt sent");
-            var result = chatClient.prompt(prompt).call();
-            if (result.content() == null) {
+            var result = chatClient.prompt(prompt).call().content();
+            if (result == null) {
                 throw new ChatServiceException("OpenAI returned null or empty content");
             }
-            log.info("OpenAI returned: {}", result.content());
-            return result.content();
+            log.info("OpenAI returned: {}", result);
+            return result;
         } catch (HttpClientErrorException | HttpServerErrorException e) {
             log.error("OpenAI HTTP error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
             throw new ChatServiceException("OpenAI API error: " + e.getStatusCode(), e);
