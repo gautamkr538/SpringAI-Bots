@@ -70,7 +70,7 @@ public class ChatServiceImpl implements ChatService {
             // Detect URLs in the extracted text
             List<Document> enhancedContent = textContent.stream()
                     .map(document -> {
-                        String content = document.getContent();
+                        String content = document.getText();
                         List<String> urls = extractUrls(content);
                         // Append URLs to the content
                         if (!urls.isEmpty()) {
@@ -103,8 +103,9 @@ public class ChatServiceImpl implements ChatService {
         log.info("Received query: {}", question);
         try {
             List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
+            assert similarDocuments != null;
             String documents = similarDocuments.stream()
-                    .map(Document::getContent)
+                    .map(Document::getText)
                     .collect(Collectors.joining(System.lineSeparator()));
             // Prepare prompt for code generation
             String template = """
@@ -122,7 +123,8 @@ public class ChatServiceImpl implements ChatService {
             UserMessage userMessage = new UserMessage(question);
             Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
             log.info("Prompt sent");
-            var result = chatClient.prompt(prompt).call().content();
+            var response = chatClient.prompt(prompt).call();
+            var result = response.content();
             if (result == null) {
                 throw new ChatServiceException("OpenAI returned null or empty content");
             }
