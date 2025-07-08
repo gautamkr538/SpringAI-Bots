@@ -1,3 +1,4 @@
+/*
 package com.SpringAI.RAG.service.serviceImpl;
 
 import com.SpringAI.RAG.exception.CrawlException;
@@ -200,4 +201,4 @@ public class WebDataServiceImpl implements WebDataService {
             throw new ContentExtractionException("Error while querying content", e);
         }
     }
-}
+}*/
