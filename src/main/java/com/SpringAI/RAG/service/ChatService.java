@@ -1,5 +1,7 @@
 package com.SpringAI.RAG.service;
 
+import com.SpringAI.RAG.dto.BlogPostResponseDTO;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface ChatService {
@@ -17,7 +19,7 @@ public interface ChatService {
      * @param question The query to be asked to the chatbot.
      * @return The chatbot's response.
      */
-    String chatBot(String question);
+    ResponseEntity<String> chatBotForVectorStore(String question);
 
     /**
      * Generates code based on the provided prompt.
@@ -26,4 +28,12 @@ public interface ChatService {
      * @return The generated code.
      */
     String codeGeneratorBot(String prompt);
+
+    ResponseEntity<String> ImageDetectionBot(MultipartFile image, String question);
+
+    ResponseEntity<byte[]> VoiceGenerationBot(String text);
+
+    ResponseEntity<String> ImageGenerationBot(String prompt);
+
+    BlogPostResponseDTO blogPostBot(String question);
 }
