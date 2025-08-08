@@ -8,7 +8,6 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.image.ImageGeneration;
 import org.springframework.ai.image.ImageOptions;
 import org.springframework.ai.image.ImagePrompt;
 import org.springframework.ai.image.ImageResponse;
@@ -41,7 +40,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -492,9 +490,12 @@ public class ChatServiceImpl implements ChatService {
             }
             var response = chatClient.prompt()
                     .system(formattedTemplate)
-                    .user(userSpec -> userSpec
-                            .text(question)
-                            .media(MimeTypeUtils.IMAGE_JPEG, image.getResource())
+                    .user(userSpec -> {
+                                assert question != null;
+                                userSpec
+                                        .text(question)
+                                        .media(MimeTypeUtils.IMAGE_JPEG, image.getResource());
+                            }
                     )
                     .call();
             String result = response.content();
@@ -553,7 +554,7 @@ public class ChatServiceImpl implements ChatService {
                                • Uses bullet points or short paragraphs; keep response under 500 words.
                             
                             OUTPUT EXAMPLE
-                            [PROJECT: Social Media Promo]  
+                            [PROJECT: Social Media Promo]
                             [DIMENSIONS: 1080×1080 px JPG, RGB]  
                             [STYLE: Vibrant flat illustration]  
                             [COLORS: #FF6F61, #2E86C1, #FFFFFF]  
