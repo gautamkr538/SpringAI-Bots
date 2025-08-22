@@ -10,7 +10,7 @@ RESTful APIs to expose chatbot, weather, and content-generation features
 External Services like OpenAI APIs, Selenium for data crawling, and external weather APIs
 The following diagram provides a complete architecture flow:
 
-<img width="1483" height="714" alt="Screenshot 2025-08-22 at 1 20 44 PM" src="https://github.com/user-attachments/assets/c82fa168-0174-471d-bfac-cc40e6ff8ed9" />
+<img width="3840" height="1788" alt="SpringAI_Project_FlowChart" src="https://github.com/user-attachments/assets/6e580dea-fe78-48c0-a2e3-cb30a1d71211" />
 
 
 🚀 Features
