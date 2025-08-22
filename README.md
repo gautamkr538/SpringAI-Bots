@@ -49,7 +49,7 @@ External & Infra	External API calls, Vector DB, Database operations
 Config Layer	pom.xml, compose.yaml, and application configuration files
 ⚡ How to Run
 1. Clone the repository
-git clone https://github.com/your-org/spring-ai-rag.git
+git clone https://github.com/gautamkr538/SpringAI-Bots.git
 cd spring-ai-rag
 
 2. Configure Environment
