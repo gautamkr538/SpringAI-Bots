@@ -1,6 +1,6 @@
 # Spring AI RAG Workflow
 
-This repository contains a **Spring Boot + Spring AI powered application** that demonstrates **Retrieval-Augmented Generation (RAG)** for AI-driven features, including chatbots, blog generation, code assistance, weather integration, and multimedia services.
+This repository contains a **Spring Boot + Selenium + Jsoup + Spring AI powered application** that demonstrates **Retrieval-Augmented Generation (RAG)** for AI-driven features, including chatbots, blog generation, code assistance, weather integration, multimedia and Web crawl and query over crawled data services.
 
 ---
 
@@ -8,7 +8,7 @@ This repository contains a **Spring Boot + Spring AI powered application** that 
 This project integrates:
 - **Spring AI** for LLM-based interactions  
 - **Vector Database** for semantic embeddings and similarity search  
-- **RESTful APIs** to expose chatbot, weather, and content-generation features  
+- **RESTful APIs** to expose chatbot, weather (Current), content-generation and Web crawl features
 - **External Services** like OpenAI APIs, Selenium for data crawling, and external weather APIs  
 
 The following diagram provides a complete architecture flow:
@@ -26,7 +26,8 @@ The following diagram provides a complete architecture flow:
 - **imageDetectionBot** – AI-based image analysis  
 - **imageGenerationBot** – AI-driven image creation  
 - **voiceGenerationBot** – AI voice/speech synthesis  
-- **codeBot** – Code-related assistance  
+- **codeBot** – Code-related assistance
+- **webCrawlBot** – Crawl any website URL  
 
 ### **2️⃣ Weather Controller**
 Provides weather-related endpoints:
@@ -35,7 +36,7 @@ Provides weather-related endpoints:
 - **air-quality** – Check air quality data  
 - **compare** – Compare weather between cities  
 - **coordinates** – Search weather by coordinates  
-- **query** – General query endpoint  
+- **query** – General query endpoint for crawled data 
 
 ---
 
