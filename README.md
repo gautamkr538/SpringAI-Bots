@@ -1,6 +1,6 @@
 # Spring AI RAG Workflow
 
-This repository contains a ** Java + Spring Boot + Selenium + Jsoup + Spring AI + VectorDB + RDBMS powered application** that demonstrates **Retrieval-Augmented Generation (RAG)** for AI-driven features, including chatbots, blog generation, code assistance, weather integration, multimedia and Website crawl services and query over crawled data.
+This repository contains a **Java + Spring Boot + Selenium + Jsoup + Spring AI + VectorDB + RDBMS powered application** that demonstrates **Retrieval-Augmented Generation (RAG)** for AI-driven features, including chatbots, blog generation, code assistance, weather integration, multimedia and Website crawl services and query over crawled data.
 
 ---
 
