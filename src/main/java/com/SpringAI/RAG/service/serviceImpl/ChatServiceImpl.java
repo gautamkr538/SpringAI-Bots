@@ -662,11 +662,19 @@ public class ChatServiceImpl implements ChatService {
                             {prompt}
                             """;
 
-            String formattedTemplate = "";
+            var voiceScript ="";
             if(text != null && !text.isEmpty()) {
-                formattedTemplate = template.replace("{prompt}", text);
+                SystemMessage systemMessage = new SystemMessage(template.replace("{prompt}", text));
+                UserMessage userMessage = new UserMessage(text);
+                Prompt prompt = new Prompt(List.of(systemMessage, userMessage));
+                log.info("Prompt sent");
+                var response = chatClient.prompt(prompt).call();
+                voiceScript = response.content();
             }
-
+            if (voiceScript == null) {
+                throw new ChatServiceException("OpenAI returned null or empty content");
+            }
+            log.info("Generated voice script: {}", voiceScript);
             OpenAiAudioSpeechOptions options = OpenAiAudioSpeechOptions.builder()
                     .model("tts-1-hd")
                     .voice(OpenAiAudioApi.SpeechRequest.Voice.ALLOY)
@@ -674,7 +682,7 @@ public class ChatServiceImpl implements ChatService {
                     .speed(1.0f)
                     .build();
 
-            SpeechPrompt speechPrompt = new SpeechPrompt(formattedTemplate, options);
+            SpeechPrompt speechPrompt = new SpeechPrompt(voiceScript, options);
             SpeechResponse speechResponse = speechModel.call(speechPrompt);
 
             byte[] audioBytes = speechResponse.getResult().getOutput();
