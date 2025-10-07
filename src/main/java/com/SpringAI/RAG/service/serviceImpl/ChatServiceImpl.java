@@ -11,6 +11,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.image.ImageOptions;
 import org.springframework.ai.image.ImagePrompt;
 import org.springframework.ai.image.ImageResponse;
+import org.springframework.ai.moderation.*;
 import org.springframework.ai.openai.OpenAiAudioSpeechModel;
 import org.springframework.ai.openai.OpenAiAudioSpeechOptions;
 import org.springframework.ai.openai.OpenAiImageModel;
@@ -40,7 +41,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -51,6 +54,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatClient chatClient;
     private final OpenAiImageModel imageModel;
     private final OpenAiAudioSpeechModel speechModel;
+    private final ModerationModel moderationModel;
 
     @Autowired
     @Qualifier("customVectorStore")
@@ -60,12 +64,13 @@ public class ChatServiceImpl implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatServiceImpl.class);
 
-    public ChatServiceImpl(ChatClient.Builder chatClientBuilder, OpenAiImageModel imageModel, OpenAiAudioSpeechModel speechModel, VectorStore vectorStore, JdbcTemplate jdbcTemplate) {
+    public ChatServiceImpl(ChatClient.Builder chatClientBuilder, OpenAiImageModel imageModel, OpenAiAudioSpeechModel speechModel, VectorStore vectorStore, JdbcTemplate jdbcTemplate, ModerationModel moderationModel) {
         this.chatClient = chatClientBuilder.build();
         this.imageModel = imageModel;
         this.speechModel = speechModel;
         this.vectorStore = vectorStore;
         this.jdbcTemplate = jdbcTemplate;
+        this.moderationModel = moderationModel;
     }
 
     @Override
@@ -808,5 +813,48 @@ public class ChatServiceImpl implements ChatService {
         }
     }
 
+    public ResponseEntity<Map<String, Object>> checkViolations(String text) {
+        log.info("Checking message for active moderation violations");
+        try {
+            if (text == null || text.trim().isEmpty()) {
+                throw new ChatServiceException("Message cannot be empty");
+            }
+            ModerationPrompt prompt = new ModerationPrompt(text.trim());
+            ModerationResponse response = moderationModel.call(prompt);
+            Moderation moderation = response.getResult().getOutput();
+            ModerationResult result = moderation.getResults().getFirst();
 
+            Map<String, Object> resultResponse = new LinkedHashMap<>();
+            resultResponse.put("flagged", result.isFlagged());
+
+            // Only add violated categories
+            Categories c = result.getCategories();
+            CategoryScores s = result.getCategoryScores();
+
+            Map<String, Object> violations = new LinkedHashMap<>();
+            if (c.isSexual()) violations.put("Sexual", Map.of("score", s.getSexual()));
+            if (c.isHate()) violations.put("Hate", Map.of("score", s.getHate()));
+            if (c.isHarassment()) violations.put("Harassment", Map.of("score", s.getHarassment()));
+            if (c.isViolence()) violations.put("Violence", Map.of("score", s.getViolence()));
+            if (c.isSelfHarm()) violations.put("Self-Harm", Map.of("score", s.getSelfHarm()));
+            if (c.isSexualMinors()) violations.put("SexualMinors", Map.of("score", s.getSexualMinors()));
+            if (c.isHateThreatening()) violations.put("HateThreatening", Map.of("score", s.getHateThreatening()));
+            if (c.isViolenceGraphic()) violations.put("ViolenceGraphic", Map.of("score", s.getViolenceGraphic()));
+            if (c.isSelfHarmIntent()) violations.put("SelfHarmIntent", Map.of("score", s.getSelfHarmIntent()));
+            if (c.isSelfHarmInstructions()) violations.put("SelfHarmInstructions", Map.of("score", s.getSelfHarmInstructions()));
+            if (c.isHarassmentThreatening()) violations.put("HarassmentThreatening", Map.of("score", s.getHarassmentThreatening()));
+
+            if (!violations.isEmpty()) {
+                resultResponse.put("violations", violations);
+            }
+
+            resultResponse.put("moderation_id", moderation.getId());
+            resultResponse.put("model", moderation.getModel());
+
+            return ResponseEntity.ok(resultResponse);
+        } catch (Exception e) {
+            log.error("Moderation error: {}", e.getMessage());
+            throw new ChatServiceException("Moderation check failed", e);
+        }
+    }
 }
