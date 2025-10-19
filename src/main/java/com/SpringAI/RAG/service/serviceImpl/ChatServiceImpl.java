@@ -1,8 +1,10 @@
 package com.SpringAI.RAG.service.serviceImpl;
 
+import com.SpringAI.RAG.config.ModerationThresholds;
 import com.SpringAI.RAG.dto.BlogPostResponseDTO;
 import com.SpringAI.RAG.exception.ChatServiceException;
 import com.SpringAI.RAG.service.ChatService;
+import com.SpringAI.RAG.utils.ModerationService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -11,6 +13,7 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.image.ImageOptions;
 import org.springframework.ai.image.ImagePrompt;
 import org.springframework.ai.image.ImageResponse;
+import org.springframework.ai.moderation.*;
 import org.springframework.ai.openai.OpenAiAudioSpeechModel;
 import org.springframework.ai.openai.OpenAiAudioSpeechOptions;
 import org.springframework.ai.openai.OpenAiImageModel;
@@ -28,6 +31,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -40,7 +44,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -51,6 +57,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatClient chatClient;
     private final OpenAiImageModel imageModel;
     private final OpenAiAudioSpeechModel speechModel;
+    private final ModerationService moderationService;
 
     @Autowired
     @Qualifier("customVectorStore")
@@ -60,10 +67,11 @@ public class ChatServiceImpl implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatServiceImpl.class);
 
-    public ChatServiceImpl(ChatClient.Builder chatClientBuilder, OpenAiImageModel imageModel, OpenAiAudioSpeechModel speechModel, VectorStore vectorStore, JdbcTemplate jdbcTemplate) {
+    public ChatServiceImpl(ChatClient.Builder chatClientBuilder, OpenAiImageModel imageModel, OpenAiAudioSpeechModel speechModel, ModerationService moderationService, VectorStore vectorStore, JdbcTemplate jdbcTemplate) {
         this.chatClient = chatClientBuilder.build();
         this.imageModel = imageModel;
         this.speechModel = speechModel;
+        this.moderationService = moderationService;
         this.vectorStore = vectorStore;
         this.jdbcTemplate = jdbcTemplate;
     }
@@ -121,6 +129,10 @@ public class ChatServiceImpl implements ChatService {
     public ResponseEntity<String> chatBotForVectorStore(String question) {
         log.info("Received query to ChatBot: {}", question);
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(question);
+
             List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
             assert similarDocuments != null;
             String documents = similarDocuments.stream()
@@ -198,6 +210,10 @@ public class ChatServiceImpl implements ChatService {
     public BlogPostResponseDTO blogPostBot(String question) {
         log.info("Received query for BlogBot: {}", question);
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(question);
+
             List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
             assert similarDocuments != null;
             String documents = similarDocuments.stream()
@@ -521,6 +537,10 @@ public class ChatServiceImpl implements ChatService {
     public ResponseEntity<String> ImageGenerationBot(String prompt) {
         log.info("Received query for imageGeneration");
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(prompt);
+
             String template = """
                             You are an Image Generation Bot. Convert the user’s description into a concise, production-ready visual brief.
                             
@@ -600,67 +620,41 @@ public class ChatServiceImpl implements ChatService {
     public ResponseEntity<byte[]> VoiceGenerationBot(String text) {
         log.info("Received query for voiceGeneration");
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(text);
+
             String template = """
-                            You are a Voice Generation Bot. Transform text into voice-optimized scripts and audio content specifications for professional spoken delivery.
-                            
-                            PRIMARY GOAL
-                            • Create complete voice scripts with performance directions, timing cues, and technical specs for various audio content types.
-                            
-                            1. CONTENT IDENTIFICATION
-                               • Accept voice requests: podcast scripts, voiceovers, audiobook narration, IVR systems, virtual assistant responses, presentations, educational content, advertisements, audio announcements.
-                               • If NOT requesting voice content, reply exactly:
-                                 "This is the Voice Generation Bot. Please use the appropriate bot for non-voice content requests."
-                            
-                            2. SCRIPT QUALITY STANDARDS
-                               • Write for spoken delivery: conversational, natural language patterns
-                               • Use 15-20 word sentences maximum for comfortable speech
-                               • Eliminate tongue twisters and complex pronunciations
-                               • Include strategic pauses and breathing points
-                               • Add phonetic spellings for difficult words: "Data [DAY-tuh]"
-                            
-                            3. VOICE SCRIPT FORMATTING
-                               • Performance markers: [PAUSE], [EMPHASIS], [SLOWER], [FASTER]
-                               • Emotional cues: [CONFIDENT], [FRIENDLY], [SERIOUS], [ENTHUSIASTIC]
-                               • Delivery style: [NORMAL/SLOW/FAST pace], [SOFT/NORMAL/LOUD volume]
-                               • Energy level: [LOW], [MEDIUM], [HIGH], [BUILDING]
-                               • Timing: [2-SECOND PAUSE], [QUICK PAUSE], [BREATH]
-                            
-                            4. TECHNICAL SPECIFICATIONS
-                               • Voice characteristics: pitch, tone, speed, gender
-                               • Audio quality: sample rate, bitrate, format
-                               • Background music or sound effects when relevant
-                               • Estimated duration and word count
-                            
-                            5. CONTENT CATEGORIES
-                               • Commercial: Ads, product demos, brand voice content
-                               • Educational: E-learning, instructional, training materials
-                               • Interactive: IVR prompts, virtual assistants, chatbots
-                               • Entertainment: Podcasts, audiobooks, gaming dialogue
-                            
-                            6. OUTPUT FORMAT
-                               • Complete script with all performance directions
-                               • Technical specifications and voice recommendations
-                               • Alternative takes when appropriate
-                            
-                            SCRIPT EXAMPLE:
-                            [TITLE: Product Demo]
-                            [DURATION: 2 minutes]
-                            [VOICE: Professional, confident, medium pace]
-                            [BACKGROUND: Subtle corporate music]
-                            
-                            [ENTHUSIASTIC] Welcome to productivity! [2-SECOND PAUSE]
-                            [CONVERSATIONAL] Ever wonder how teams stay organized? [PAUSE] The answer is SimpleTask Pro.
-                            
-                            7. QUALITY CHECKLIST
-                               • Natural flow when read aloud
-                               • Appropriate pacing and breathing opportunities
-                               • Consistent emotional tone
-                               • Clear pronunciation guidance
-                               • Engaging and professional delivery
-                            
-                            PROMPT:
-                            {prompt}
-                            """;
+            You are a Professional Voice Script Writer specializing in creating audio-optimized content for text-to-speech conversion.
+            
+            OBJECTIVE
+            Transform the user's text into a natural, conversational voice script ready for audio narration.
+            
+            INSTRUCTIONS
+            1. Rewrite content using spoken language patterns (avoid complex jargon)
+            2. Keep sentences to 15-20 words maximum for natural speech flow
+            3. Remove tongue twisters and difficult pronunciations
+            4. Add strategic pauses using [PAUSE] markers
+            5. Include tone markers only when necessary: [ENTHUSIASTIC], [SERIOUS], [FRIENDLY]
+            6. Write ONLY the voice script - no meta-commentary or explanations
+            
+            FORMATTING RULES
+            • Start directly with the script content
+            • Use [PAUSE] for natural breathing points
+            • Add [EMPHASIS] for key words or phrases
+            • Keep the output concise and speakable
+            
+            EXAMPLE INPUT
+            "Our new product features advanced AI technology that revolutionizes customer experience through automated solutions."
+            
+            EXAMPLE OUTPUT
+            "Introducing our new product. [PAUSE] It uses advanced AI [EMPHASIS] to transform how you connect with customers. [PAUSE] Everything is automated, making your work easier than ever."
+            
+            USER REQUEST:
+            {prompt}
+            
+            Remember: Output ONLY the ready-to-speak script. Do not include technical specifications, duration estimates, or instructions.
+            """;
 
             var voiceScript ="";
             if(text != null && !text.isEmpty()) {
@@ -711,6 +705,10 @@ public class ChatServiceImpl implements ChatService {
     public String codeGeneratorBot(String prompt) {
         log.info("Received code generation prompt: {}", prompt);
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(prompt);
+
             // Prepare prompt for code generation
             String template = """
                             You are an expert Code Generator Bot specializing in producing clean, efficient, and production-ready code across multiple programming languages and frameworks. Your primary function is to translate user requirements into high-quality, executable code.
@@ -837,6 +835,4 @@ public class ChatServiceImpl implements ChatService {
             throw new ChatServiceException("Unexpected error during code generation", e);
         }
     }
-
-
 }
