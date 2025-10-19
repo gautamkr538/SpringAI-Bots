@@ -1,8 +1,10 @@
 package com.SpringAI.RAG.service.serviceImpl;
 
+import com.SpringAI.RAG.config.ModerationThresholds;
 import com.SpringAI.RAG.dto.BlogPostResponseDTO;
 import com.SpringAI.RAG.exception.ChatServiceException;
 import com.SpringAI.RAG.service.ChatService;
+import com.SpringAI.RAG.utils.ModerationService;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
@@ -29,6 +31,7 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -54,7 +57,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatClient chatClient;
     private final OpenAiImageModel imageModel;
     private final OpenAiAudioSpeechModel speechModel;
-    private final ModerationModel moderationModel;
+    private final ModerationService moderationService;
 
     @Autowired
     @Qualifier("customVectorStore")
@@ -64,13 +67,13 @@ public class ChatServiceImpl implements ChatService {
 
     private static final Logger log = LoggerFactory.getLogger(ChatServiceImpl.class);
 
-    public ChatServiceImpl(ChatClient.Builder chatClientBuilder, OpenAiImageModel imageModel, OpenAiAudioSpeechModel speechModel, VectorStore vectorStore, JdbcTemplate jdbcTemplate, ModerationModel moderationModel) {
+    public ChatServiceImpl(ChatClient.Builder chatClientBuilder, OpenAiImageModel imageModel, OpenAiAudioSpeechModel speechModel, ModerationService moderationService, VectorStore vectorStore, JdbcTemplate jdbcTemplate) {
         this.chatClient = chatClientBuilder.build();
         this.imageModel = imageModel;
         this.speechModel = speechModel;
+        this.moderationService = moderationService;
         this.vectorStore = vectorStore;
         this.jdbcTemplate = jdbcTemplate;
-        this.moderationModel = moderationModel;
     }
 
     @Override
@@ -126,6 +129,10 @@ public class ChatServiceImpl implements ChatService {
     public ResponseEntity<String> chatBotForVectorStore(String question) {
         log.info("Received query to ChatBot: {}", question);
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(question);
+
             List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
             assert similarDocuments != null;
             String documents = similarDocuments.stream()
@@ -203,6 +210,10 @@ public class ChatServiceImpl implements ChatService {
     public BlogPostResponseDTO blogPostBot(String question) {
         log.info("Received query for BlogBot: {}", question);
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(question);
+
             List<Document> similarDocuments = this.vectorStore.similaritySearch(question);
             assert similarDocuments != null;
             String documents = similarDocuments.stream()
@@ -526,6 +537,10 @@ public class ChatServiceImpl implements ChatService {
     public ResponseEntity<String> ImageGenerationBot(String prompt) {
         log.info("Received query for imageGeneration");
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(prompt);
+
             String template = """
                             You are an Image Generation Bot. Convert the user’s description into a concise, production-ready visual brief.
                             
@@ -605,6 +620,10 @@ public class ChatServiceImpl implements ChatService {
     public ResponseEntity<byte[]> VoiceGenerationBot(String text) {
         log.info("Received query for voiceGeneration");
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(text);
+
             String template = """
             You are a Professional Voice Script Writer specializing in creating audio-optimized content for text-to-speech conversion.
             
@@ -686,6 +705,10 @@ public class ChatServiceImpl implements ChatService {
     public String codeGeneratorBot(String prompt) {
         log.info("Received code generation prompt: {}", prompt);
         try {
+
+            // Check for content violations with custom thresholds
+            moderationService.validate(prompt);
+
             // Prepare prompt for code generation
             String template = """
                             You are an expert Code Generator Bot specializing in producing clean, efficient, and production-ready code across multiple programming languages and frameworks. Your primary function is to translate user requirements into high-quality, executable code.
@@ -810,51 +833,6 @@ public class ChatServiceImpl implements ChatService {
         } catch (Exception e) {
             log.error("Error during code generation", e);
             throw new ChatServiceException("Unexpected error during code generation", e);
-        }
-    }
-
-    public ResponseEntity<Map<String, Object>> checkViolations(String text) {
-        log.info("Checking message for active moderation violations");
-        try {
-            if (text == null || text.trim().isEmpty()) {
-                throw new ChatServiceException("Message cannot be empty");
-            }
-            ModerationPrompt prompt = new ModerationPrompt(text.trim());
-            ModerationResponse response = moderationModel.call(prompt);
-            Moderation moderation = response.getResult().getOutput();
-            ModerationResult result = moderation.getResults().getFirst();
-
-            Map<String, Object> resultResponse = new LinkedHashMap<>();
-            resultResponse.put("flagged", result.isFlagged());
-
-            // Only add violated categories
-            Categories c = result.getCategories();
-            CategoryScores s = result.getCategoryScores();
-
-            Map<String, Object> violations = new LinkedHashMap<>();
-            if (c.isSexual()) violations.put("Sexual", Map.of("score", s.getSexual()));
-            if (c.isHate()) violations.put("Hate", Map.of("score", s.getHate()));
-            if (c.isHarassment()) violations.put("Harassment", Map.of("score", s.getHarassment()));
-            if (c.isViolence()) violations.put("Violence", Map.of("score", s.getViolence()));
-            if (c.isSelfHarm()) violations.put("Self-Harm", Map.of("score", s.getSelfHarm()));
-            if (c.isSexualMinors()) violations.put("SexualMinors", Map.of("score", s.getSexualMinors()));
-            if (c.isHateThreatening()) violations.put("HateThreatening", Map.of("score", s.getHateThreatening()));
-            if (c.isViolenceGraphic()) violations.put("ViolenceGraphic", Map.of("score", s.getViolenceGraphic()));
-            if (c.isSelfHarmIntent()) violations.put("SelfHarmIntent", Map.of("score", s.getSelfHarmIntent()));
-            if (c.isSelfHarmInstructions()) violations.put("SelfHarmInstructions", Map.of("score", s.getSelfHarmInstructions()));
-            if (c.isHarassmentThreatening()) violations.put("HarassmentThreatening", Map.of("score", s.getHarassmentThreatening()));
-
-            if (!violations.isEmpty()) {
-                resultResponse.put("violations", violations);
-            }
-
-            resultResponse.put("moderation_id", moderation.getId());
-            resultResponse.put("model", moderation.getModel());
-
-            return ResponseEntity.ok(resultResponse);
-        } catch (Exception e) {
-            log.error("Moderation error: {}", e.getMessage());
-            throw new ChatServiceException("Moderation check failed", e);
         }
     }
 }
