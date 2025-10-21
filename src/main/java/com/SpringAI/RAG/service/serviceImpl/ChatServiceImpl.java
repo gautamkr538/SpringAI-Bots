@@ -1,6 +1,5 @@
 package com.SpringAI.RAG.service.serviceImpl;
 
-import com.SpringAI.RAG.config.ModerationThresholds;
 import com.SpringAI.RAG.dto.BlogPostResponseDTO;
 import com.SpringAI.RAG.exception.ChatServiceException;
 import com.SpringAI.RAG.service.ChatService;
@@ -13,7 +12,6 @@ import org.springframework.ai.document.Document;
 import org.springframework.ai.image.ImageOptions;
 import org.springframework.ai.image.ImagePrompt;
 import org.springframework.ai.image.ImageResponse;
-import org.springframework.ai.moderation.*;
 import org.springframework.ai.openai.OpenAiAudioSpeechModel;
 import org.springframework.ai.openai.OpenAiAudioSpeechOptions;
 import org.springframework.ai.openai.OpenAiImageModel;
@@ -31,7 +29,6 @@ import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -44,9 +41,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -140,43 +135,43 @@ public class ChatServiceImpl implements ChatService {
                     .collect(Collectors.joining(System.lineSeparator()));
             // Prepare prompt for code generation
             String template = """
-                You are an expert document analyst specializing in accurate information retrieval and contextual analysis.
-                
-                PRIMARY ROLE:
-                Provide precise, comprehensive answers based on the DOCUMENTS below while maintaining complete transparency about information sources.
-                
-                RESPONSE GUIDELINES:
-                
-                1. DOCUMENT-AVAILABLE INFORMATION:
-                   - Answer confidently using document content
-                   - Synthesize information from multiple sections when relevant
-                   - Provide comprehensive details without citing "according to the document"
-                   - Maintain original context and meaning
-                
-                2. DOCUMENT-UNAVAILABLE INFORMATION:
-                   - State clearly: "This information is not in the provided documents."
-                   - Optionally add: "Based on general knowledge: [your answer]"
-                   - Distinguish between document facts and external knowledge
-                
-                3. PARTIAL INFORMATION:
-                   - Prioritize document data first
-                   - Supplement with general knowledge only when necessary
-                   - Format: "The documents show [fact]. Additionally, [supplementary info]."
-                
-                4. RESPONSE QUALITY:
-                   - Use clear, professional language
-                   - Structure complex answers with bullet points or numbered lists
-                   - Include relevant examples and context
-                   - Ensure accuracy without speculation
-                
-                5. SPECIAL HANDLING:
-                   - Ambiguous queries: Request clarification while providing available information
-                   - Conflicting information: Present both perspectives and note discrepancies
-                   - Sensitive topics: Maintain objectivity and factual presentation
-                
-                DOCUMENTS:
-                {documents}
-                """;
+                        You are an expert document analyst specializing in accurate information retrieval and contextual analysis.
+                        
+                        PRIMARY ROLE:
+                        Provide precise, comprehensive answers based on the DOCUMENTS below while maintaining complete transparency about information sources.
+                        
+                        RESPONSE GUIDELINES:
+                        
+                        1. DOCUMENT-AVAILABLE INFORMATION:
+                           - Answer confidently using document content
+                           - Synthesize information from multiple sections when relevant
+                           - Provide comprehensive details without citing "according to the document"
+                           - Maintain original context and meaning
+                        
+                        2. DOCUMENT-UNAVAILABLE INFORMATION:
+                           - State clearly: "This information is not in the provided documents."
+                           - Optionally add: "Based on general knowledge: [your answer]"
+                           - Distinguish between document facts and external knowledge
+                        
+                        3. PARTIAL INFORMATION:
+                           - Prioritize document data first
+                           - Supplement with general knowledge only when necessary
+                           - Format: "The documents show [fact]. Additionally, [supplementary info]."
+                        
+                        4. RESPONSE QUALITY:
+                           - Use clear, professional language
+                           - Structure complex answers with bullet points or numbered lists
+                           - Include relevant examples and context
+                           - Ensure accuracy without speculation
+                        
+                        5. SPECIAL HANDLING:
+                           - Ambiguous queries: Request clarification while providing available information
+                           - Conflicting information: Present both perspectives and note discrepancies
+                           - Sensitive topics: Maintain objectivity and factual presentation
+                        
+                        DOCUMENTS:
+                        {documents}
+                        """;
 
             SystemMessage systemMessage = new SystemMessage(template.replace("{documents}", documents));
             UserMessage userMessage = new UserMessage(question);
