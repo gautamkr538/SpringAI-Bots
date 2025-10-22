@@ -18,11 +18,12 @@ import java.util.List;
 public class ChatController {
 
     private final ChatService chatService;
-   private final WebDataService webDataService;
+   /*private final WebDataService webDataService;*/
 
-    public ChatController(ChatService chatService, WebDataService webDataService) {
+    public ChatController(ChatService chatService
+            /*, WebDataService webDataService*/) {
         this.chatService = chatService;
-        this.webDataService = webDataService;
+        /*this.webDataService = webDataService;*/
     }
 
     @PostMapping("/pdfStore")
@@ -71,7 +72,7 @@ public class ChatController {
         return ResponseEntity.ok(code);
     }
 
-    @PostMapping("/crawlWeb/store")
+    /*@PostMapping("/crawlWeb/store")
     @Operation(summary = "Crawl a website and store content in vector_store",
             description = "Crawl a website and store the extracted content")
     public ResponseEntity<String> crawlAndStoreContent(@RequestBody WebDataRequest request) throws IOException {
@@ -86,5 +87,5 @@ public class ChatController {
     public ResponseEntity<String> queryContent(@RequestBody WebDataRequest request) {
         String response = webDataService.queryContent(request.getQuery());
         return ResponseEntity.ok(response);
-    }
+    }*/
 }
