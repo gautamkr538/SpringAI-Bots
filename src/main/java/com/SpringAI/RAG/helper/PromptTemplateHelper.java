@@ -23,7 +23,7 @@ public class PromptTemplateHelper {
                 
                 RESPONSE GUIDELINES:
                 1. For document-based information: Answer naturally without citations
-                2. For supplementary knowledge: Use "📚 From my knowledge base:" marker
+                2. For supplementary knowledge: Use "From my knowledge base:" marker
                 3. NEVER blend document and general knowledge without clear separation
                 4. Tailor response depth to query specificity level
                 
@@ -52,7 +52,7 @@ public class PromptTemplateHelper {
                 
                 GUIDELINES:
                 1. For document info: Answer naturally without citing
-                2. For general knowledge: Use "📚 From my knowledge base:" marker
+                2. For general knowledge: Use "From my knowledge base:" marker
                 3. NEVER blend without clear separation
                 
                 DOCUMENTS:
@@ -70,7 +70,7 @@ public class PromptTemplateHelper {
         String template = """
                 Provide helpful answer from your knowledge.
                 Start with: "I don't have specific information in the documents."
-                Then: "💡 From my knowledge base: [answer]"
+                Then: "From my knowledge base: [answer]"
                 
                 QUESTION: {question}
                 """;

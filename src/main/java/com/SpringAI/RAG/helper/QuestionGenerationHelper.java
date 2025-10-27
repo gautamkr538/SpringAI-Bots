@@ -84,7 +84,7 @@ public class QuestionGenerationHelper {
         log.debug("Generating FAQ suggestions from document corpus");
 
         try {
-            // ✅ Using SearchRequest.builder() - Correct approach
+            // Using SearchRequest.builder() - Correct approach
             SearchRequest searchRequest = SearchRequest.builder()
                     .query("overview summary main topics key information")
                     .topK(FAQ_SAMPLE_SIZE)
@@ -129,6 +129,7 @@ public class QuestionGenerationHelper {
 
             String response = chatClient.prompt(new Prompt(List.of(prompt))).call().content();
 
+            assert response != null;
             List<String> faqs = Arrays.stream(response.split("\n"))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
