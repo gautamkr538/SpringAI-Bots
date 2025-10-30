@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Map;
 
 @Data
@@ -17,4 +18,8 @@ public class SpecialTaskResponse {
     private String result;
     private LocalDateTime generatedAt;
     private Map<String, Object> metadata;
+
+    public Map<String, Object> getMetadataSafe() {
+        return metadata != null ? metadata : Collections.emptyMap();
+    }
 }

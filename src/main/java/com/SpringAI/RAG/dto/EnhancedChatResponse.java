@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 
 @Data
@@ -21,4 +22,16 @@ public class EnhancedChatResponse {
     private String followUpPrompt;
     private LocalDateTime timestamp;
     private String sessionId;
+
+    public List<Citation> getCitationsSafe() {
+        return citations != null ? citations : Collections.emptyList();
+    }
+
+    public List<String> getSuggestedQuestionsSafe() {
+        return suggestedQuestions != null ? suggestedQuestions : Collections.emptyList();
+    }
+
+    public String getAnswerSafe() {
+        return answer != null ? answer : "[No answer generated]";
+    }
 }

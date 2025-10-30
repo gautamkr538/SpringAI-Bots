@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.Collections;
 import java.util.List;
 
 @Data
@@ -21,16 +22,20 @@ public class QueryContext {
     private String specificity;
     private List<String> keyTerms;
     private String searchIntent;
-    
+
     public boolean hasCategory() {
         return category != null && !category.isEmpty() && !"general".equalsIgnoreCase(category);
     }
-    
+
     public boolean hasTimePeriod() {
         return timePeriod != null && !timePeriod.isEmpty();
     }
-    
+
     public boolean hasDocumentType() {
         return documentType != null && !documentType.isEmpty();
+    }
+
+    public List<String> getKeyTermsSafe() {
+        return keyTerms != null ? keyTerms : Collections.emptyList();
     }
 }

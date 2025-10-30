@@ -32,11 +32,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.ai.content.Media;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -78,23 +74,21 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
         this.jdbcTemplate = jdbcTemplate;
     }
 
-    // Non-destructive ingestion, tracking fileBatchId in all chunks for traceability
+    // Robust ingestion, unique fileBatchId for traceability
     public void initializeVectorStore(MultipartFile file) {
-        UUID batchId = UUID.randomUUID(); // Unique per upload batch
+        UUID batchId = UUID.randomUUID();
+        if (file == null || file.isEmpty()) {
+            log.error("No file provided for vector store initialization (batchId={})", batchId);
+            throw new ChatServiceException("No file provided for vector store initialization");
+        }
         try {
-            log.info("Initializing vector store, batchId={}", batchId);
-
-            if (file == null || file.isEmpty()) {
-                log.error("No file provided for vector store initialization, batchId={}", batchId);
-                throw new ChatServiceException("No file provided for vector store initialization");
-            }
             String fileName = file.getOriginalFilename();
             String mimeTypeStr = file.getContentType();
             MimeType mimeType;
             try {
                 mimeType = (mimeTypeStr != null) ? MimeType.valueOf(mimeTypeStr) : MimeType.valueOf("application/octet-stream");
             } catch (Exception ex) {
-                log.warn("Invalid MIME type '{}', using default for batchId={}", mimeTypeStr, batchId);
+                log.warn("Invalid MIME type '{}', using default (batchId={})", mimeTypeStr, batchId);
                 mimeType = MimeType.valueOf("application/octet-stream");
             }
             Resource resource = new InputStreamResource(file.getInputStream());
@@ -153,22 +147,24 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
 
             log.info("Vector store updated for file '{}' with batchId={}", fileName, batchId);
         } catch (Exception e) {
-            log.error("Vector store init failed, file: '{}', error: {}", file != null ? file.getOriginalFilename() : "null", e.getMessage(), e);
+            log.error("Vector store init failed for file '{}' (batchId={}), error: {}",
+                    file != null ? file.getOriginalFilename() : "null",
+                    batchId,
+                    e.getMessage(), e);
             throw new ChatServiceException("Vector store initialization failed", e);
         }
     }
 
-    // Use for multi-file batches: always pass same batchId for group consistency
     public List<Document> buildDocumentsFromFiles(List<MultipartFile> files, UUID batchId) {
         List<Document> docs = new ArrayList<>();
         if (files == null || files.isEmpty()) {
-            log.warn("No files provided for document building, batchId={}", batchId);
+            log.warn("No files provided for document building (batchId={})", batchId);
             return docs;
         }
 
         for (MultipartFile file : files) {
-            if (file == null) {
-                log.warn("Encountered null file in upload list; skipping, batchId={}", batchId);
+            if (file == null || file.isEmpty()) {
+                log.warn("Null or empty file in upload list (batchId={}), skipping.", batchId);
                 continue;
             }
             try {
@@ -178,10 +174,9 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
                 try {
                     mimeType = (mimeTypeStr != null) ? MimeType.valueOf(mimeTypeStr) : MimeType.valueOf("application/octet-stream");
                 } catch (Exception ex) {
-                    log.warn("Invalid detected mimeType '{}' for file '{}'; using default, batchId={}", mimeTypeStr, fileName, batchId);
+                    log.warn("Invalid mimeType '{}' for file '{}'; using default (batchId={})", mimeTypeStr, fileName, batchId);
                     mimeType = MimeType.valueOf("application/octet-stream");
                 }
-
                 Resource resource = new InputStreamResource(file.getInputStream());
 
                 Map<String, Object> metadata = new HashMap<>();
@@ -199,7 +194,7 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
                     } catch (Exception ex) {
                         log.warn("Failed to read text from '{}', batchId={}, error={}", fileName, batchId, ex.getMessage());
                     }
-                    if (textContent != null) {
+                    if (textContent != null && !textContent.isEmpty()) {
                         metadata.put("detectedUrls", extractUrls(textContent));
                         doc = Document.builder().text(textContent).metadata(metadata).build();
                     } else {
@@ -213,10 +208,13 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
                 }
 
                 docs.add(doc);
-                log.info("Added document: {} ({} bytes, mime={}, batchId={})", fileName, file.getSize(), mimeType, batchId);
+                log.info("Added document '{}' ({} bytes, mimeType={}, batchId={})", fileName, file.getSize(), mimeType, batchId);
 
             } catch (Exception e) {
-                log.error("Failed to process file '{}', batchId={}, error={}", file != null ? file.getOriginalFilename() : null, batchId, e.getMessage(), e);
+                log.error("Failed to process file '{}' (batchId={}), error={}",
+                        file != null ? file.getOriginalFilename() : null,
+                        batchId,
+                        e.getMessage(), e);
             }
         }
         return docs;
@@ -224,6 +222,7 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
 
     private List<String> extractUrls(String text) {
         List<String> urls = new ArrayList<>();
+        if (text == null || text.isEmpty()) return urls;
         String urlRegex = "(https?://[\\w\\-._~:/?\\[\\]@!$&'()*+,;=%]+)";
         Matcher matcher = Pattern.compile(urlRegex).matcher(text);
         while (matcher.find()) {
@@ -236,30 +235,32 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
     public EnhancedChatResponse chat(String question) {
         final String sessionId = UUID.randomUUID().toString();
         final long startTime = System.currentTimeMillis();
-
+        if (question == null || question.trim().isEmpty()) {
+            log.error("[{}] Chat failed: question must not be empty.", sessionId);
+            throw new ChatServiceException("Chat failed: question must not be empty.");
+        }
         log.info("[{}] Chat query: '{}'", sessionId, question);
 
         try {
             moderationService.validate(question);
 
             QueryContext queryContext = contextExtractor.extractContext(question);
+            if (queryContext == null) queryContext = new QueryContext();
             log.info("[{}] Query context: category={}, specificity={}, priority={}", sessionId, queryContext.getCategory(), queryContext.getSpecificity(), queryContext.getPriority());
 
             SearchRequest searchRequest = searchStrategy.createAdvancedSearchRequest(question, queryContext);
             log.debug("[{}] Search config: topK={}, threshold={}", sessionId, searchRequest.getTopK(), searchRequest.getSimilarityThreshold());
 
             List<Document> documents = vectorStore.similaritySearch(searchRequest);
-
-            if ((documents == null || documents.isEmpty()) && queryContext.hasCategory()) {
-                log.warn("[{}] Primary search returned no results, trying fallback", sessionId);
+            if (documents == null || documents.isEmpty()) {
+                log.warn("[{}] Primary search returned no results, trying fallback.", sessionId);
                 SearchRequest fallbackRequest = searchStrategy.createFallbackSearchRequest(question);
                 documents = vectorStore.similaritySearch(fallbackRequest);
             }
-
             boolean hasDocuments = (documents != null && !documents.isEmpty());
 
             if (!hasDocuments) {
-                log.warn("[{}] No relevant documents found after fallback", sessionId);
+                log.warn("[{}] No relevant documents found after fallback.", sessionId);
                 return buildGeneralKnowledgeResponse(question, sessionId);
             }
 
@@ -267,17 +268,18 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
             double confidence = citationHelper.calculateConfidence(citations);
             String docContext = citationHelper.buildContext(documents);
 
-            if (citations.isEmpty()) {
-                log.warn("[{}] CitationHelper returned no citations; creating fallback citation from documents", sessionId);
+            // Guarantee at least one citation
+            if (citations == null || citations.isEmpty()) {
+                log.warn("[{}] CitationHelper returned no citations; creating fallback.", sessionId);
                 Citation fallback = createGeneratedCitation("Documents (generated)",
-                        summarizeForCitation(docContext, 400),
-                        0.5,
+                        summarizeForCitation(docContext, 400), 0.5,
                         "No citations extracted from documents; created fallback from document text");
                 citations = List.of(fallback);
                 confidence = fallback.getRelevanceScore();
             }
 
-            log.info("[{}] Retrieved {} documents with avg confidence {}", sessionId, documents.size(), String.format("%.2f", confidence));
+            log.info("[{}] Retrieved {} documents with avg confidence {}",
+                    sessionId, (documents != null ? documents.size() : 0), String.format("%.2f", confidence));
 
             String answer = generateAnswer(question, docContext, queryContext);
 
@@ -286,11 +288,11 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
             List<String> relatedQuestions = questionHelper.generateRelated(question, answer);
 
             final long duration = System.currentTimeMillis() - startTime;
-            log.info("[{}] Response generated in {}ms | Confidence: {} | Source: {} | Citations: {}",
-                    sessionId, duration, String.format("%.2f", confidence), attribution, citations.size());
+            log.info("[{}] Response generated in {} ms | Confidence: {} | Source: {} | Citations: {}",
+                    sessionId, duration, String.format("%.2f", confidence), attribution, (citations != null ? citations.size() : 0));
 
             return EnhancedChatResponse.builder()
-                    .answer(answer)
+                    .answer(answer != null ? answer : "[No answer generated]")
                     .citations(citations)
                     .confidenceScore(confidence)
                     .sourceAttribution(attribution)
@@ -301,32 +303,33 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
                     .build();
 
         } catch (Exception e) {
-            log.error("[{}] Chat error", sessionId, e);
+            log.error("[{}] Chat error: {}", sessionId, e.getMessage(), e);
             throw new ChatServiceException("Chat failed: " + e.getMessage(), e);
         }
     }
 
     private String generateAnswer(String question, String docContext, QueryContext queryContext) {
+        if (promptHelper == null) throw new ChatServiceException("PromptTemplateHelper is not configured.");
         var prompt = promptHelper.createContextAwarePrompt(question, docContext, queryContext);
-        return chatClient.prompt(prompt).call().content();
+        var response = chatClient.prompt(prompt).call();
+        return response != null ? response.content() : "[No content returned]";
     }
 
     private EnhancedChatResponse buildGeneralKnowledgeResponse(String question, String sessionId) {
-        log.info("[{}] Building general knowledge response", sessionId);
-
+        log.info("[{}] Building general knowledge response...", sessionId);
         var prompt = promptHelper.createGeneralKnowledgePrompt(question);
-        String answer = chatClient.prompt(prompt).call().content();
+        var response = chatClient.prompt(prompt).call();
+        String answer = response != null ? response.content() : "[No answer generated]";
 
-        List<String> faqSuggestions = questionHelper.generateFAQSuggestions(vectorStore);
+        List<String> faqSuggestions = questionHelper != null && vectorStore != null ?
+                questionHelper.generateFAQSuggestions(vectorStore) :
+                Collections.singletonList("No FAQs available.");
 
         String finalAnswer = answer + "\n\n---\n Questions I can answer from documents:\n" +
-                faqSuggestions.stream()
-                        .map(q -> "• " + q)
-                        .reduce("", (a, b) -> a + "\n" + b);
+                faqSuggestions.stream().map(q -> "• " + q).reduce("", (a, b) -> a + "\n" + b);
 
         Citation generatedCitation = createGeneratedCitation("LLM - general knowledge",
-                summarizeForCitation(answer, 400),
-                0.3,
+                summarizeForCitation(answer, 400), 0.3,
                 "Generated citation for general knowledge answer when no documents are available");
 
         return EnhancedChatResponse.builder()
@@ -344,8 +347,7 @@ public class EnhancedChatServiceImpl implements EnhancedChatService {
     private String summarizeForCitation(String text, int maxChars) {
         if (text == null || text.isEmpty()) return "[No text available]";
         String trimmed = text.trim();
-        if (trimmed.length() <= maxChars) return trimmed;
-        return trimmed.substring(0, maxChars) + "...";
+        return trimmed.length() <= maxChars ? trimmed : trimmed.substring(0, maxChars) + "...";
     }
 
     private Citation createGeneratedCitation(String source, String textPreview, Double score, String reason) {

@@ -4,9 +4,9 @@ import com.SpringAI.RAG.dto.QueryContext;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.ai.chat.prompt.PromptTemplate;
-import org.springframework.stereotype.Component;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
 
 import java.util.*;
 import java.util.regex.Matcher;
@@ -26,19 +26,26 @@ public class QueryContextExtractor {
     public QueryContext extractContext(String userQuery) {
         log.debug("Extracting query context from: '{}'", userQuery);
 
+        if (userQuery == null || userQuery.trim().isEmpty()) {
+            log.warn("extractContext called with empty query.");
+            return createDefaultContext("[No query provided]");
+        }
+
         String template = """
                 You are a query analysis expert that extracts structured metadata from user questions.
-                
+
                 TASK: Analyze the USER QUERY and extract relevant metadata for document search filtering.
-                
+
                 Extract the following if present:
-                - category: The general topic/domain (e.g., technical, legal, financial, medical, general)
-                - time_period: Any time-related context (e.g., recent, 2024, last quarter, historical)
-                - entity_type: Type of entity mentioned (e.g., person, company, product, location)
-                - document_type: Type of document implied (e.g., report, manual, policy, guide)
-                - priority: Urgency level (high, medium, low, normal)
-                - specificity: How specific the query is (specific, general, broad)
-                
+                - category
+                - time_period
+                - entity_type
+                - document_type
+                - priority
+                - specificity
+                - key_terms (list)
+                - search_intent
+
                 OUTPUT FORMAT (JSON):
                 {
                     "category": "value or null",
@@ -50,38 +57,46 @@ public class QueryContextExtractor {
                     "key_terms": ["term1", "term2"],
                     "search_intent": "informational|navigational|transactional"
                 }
-                
+
                 Return ONLY valid JSON without markdown code blocks. If a field is not applicable, use null.
-                
+
                 USER QUERY:
                 {query}
                 """;
 
         try {
             PromptTemplate pt = new PromptTemplate(template);
-            var prompt = pt.createMessage(Map.of("query", userQuery));
+            var promptMsg = pt.createMessage(Map.of("query", userQuery));
+            var response = chatClient.prompt(new Prompt(List.of(promptMsg))).call();
+            String jsonResponse = response != null ? response.content() : null;
 
-            String jsonResponse = chatClient.prompt(new Prompt(List.of(prompt))).call().content();
+            if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+                log.warn("No ChatClient response for context extraction; returning defaults.");
+                return createDefaultContext(userQuery);
+            }
+
             QueryContext context = parseQueryContext(jsonResponse, userQuery);
-
             log.debug("Extracted context: category={}, specificity={}, key_terms={}",
-                    context.getCategory(),
-                    context.getSpecificity(),
+                    context.getCategory(), context.getSpecificity(),
                     context.getKeyTerms() != null ? context.getKeyTerms().size() : 0);
-
             return context;
 
         } catch (Exception e) {
-            log.error("Failed to extract query context, using defaults", e);
+            log.error("Failed to extract query context, using defaults. Error: {}", e.getMessage());
             return createDefaultContext(userQuery);
         }
     }
 
     private QueryContext parseQueryContext(String jsonResponse, String originalQuery) {
         try {
+            if (jsonResponse == null || jsonResponse.trim().isEmpty()) {
+                log.warn("parseQueryContext: empty response body.");
+                return createDefaultContext(originalQuery);
+            }
+
             String cleaned = jsonResponse.trim();
 
-            // Clean markdown-style code blocks if present
+            // Remove markdown code block markers, if any
             if (cleaned.startsWith("```json")) {
                 cleaned = cleaned.substring(7).trim();
             } else if (cleaned.startsWith("```")) {
@@ -92,7 +107,7 @@ public class QueryContextExtractor {
                 cleaned = cleaned.substring(0, cleaned.length() - 3).trim();
             }
 
-            log.debug("Cleaned JSON: {}", cleaned);
+            log.debug("Cleaned context JSON: {}", cleaned);
 
             return QueryContext.builder()
                     .originalQuery(originalQuery)
@@ -114,6 +129,7 @@ public class QueryContextExtractor {
 
     private QueryContext createDefaultContext(String query) {
         log.debug("Creating default context for query: '{}'", query);
+        List<String> terms = query != null ? Arrays.asList(query.trim().split("\\s+")) : Collections.emptyList();
 
         return QueryContext.builder()
                 .originalQuery(query)
@@ -121,7 +137,7 @@ public class QueryContextExtractor {
                 .specificity("general")
                 .priority("normal")
                 .searchIntent("informational")
-                .keyTerms(Arrays.asList(query.split("\\s+")))
+                .keyTerms(terms)
                 .build();
     }
 
@@ -136,7 +152,6 @@ public class QueryContextExtractor {
                 return "null".equalsIgnoreCase(value) ? null : value;
             }
 
-            // handle null explicitly
             String nullPattern = "\"" + Pattern.quote(key) + "\"\\s*:\\s*null";
             Pattern np = Pattern.compile(nullPattern);
             if (np.matcher(json).find()) {
@@ -168,7 +183,6 @@ public class QueryContextExtractor {
                         values.add(value);
                     }
                 }
-
                 return values;
             }
 

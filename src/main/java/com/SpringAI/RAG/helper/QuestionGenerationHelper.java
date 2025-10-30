@@ -28,32 +28,35 @@ public class QuestionGenerationHelper {
 
     public List<String> generateRelated(String question, String answer) {
         log.debug("Generating related questions for: '{}'", question);
-
+        if (chatClient == null) {
+            log.error("ChatClient is not configured. Returning no related questions.");
+            return Collections.emptyList();
+        }
+        if (question == null || question.isEmpty() || answer == null || answer.isEmpty()) {
+            log.warn("Question/answer are empty/null. Returning no related questions.");
+            return Collections.emptyList();
+        }
         String template = """
                 You are a conversational AI assistant generating follow-up questions.
-                
+
                 TASK: Generate {maxQuestions} natural follow-up questions based on the conversation below.
-                
+
                 REQUIREMENTS:
                 - Questions should explore related aspects not fully covered
                 - Make questions specific and actionable
                 - Use natural, conversational language
                 - Questions should logically extend the conversation
-                
+
                 OUTPUT FORMAT:
                 Return ONLY the questions, one per line, without numbering or bullets.
-                
+
                 USER QUESTION:
                 {question}
-                
+
                 ANSWER PROVIDED:
                 {answerPreview}
                 """;
-
-        String answerPreview = answer.length() > 500
-                ? answer.substring(0, 500) + "..."
-                : answer;
-
+        String answerPreview = answer.length() > 500 ? answer.substring(0, 500) + "..." : answer;
         try {
             PromptTemplate pt = new PromptTemplate(template);
             var prompt = pt.createMessage(Map.of(
@@ -64,6 +67,11 @@ public class QuestionGenerationHelper {
 
             String response = chatClient.prompt(new Prompt(List.of(prompt))).call().content();
 
+            if (response == null || response.trim().isEmpty()) {
+                log.warn("Empty response received from chatClient during related question generation. Returning no related questions.");
+                return Collections.emptyList();
+            }
+
             List<String> questions = Arrays.stream(response.split("\n"))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
@@ -71,20 +79,21 @@ public class QuestionGenerationHelper {
                     .limit(MAX_RELATED_QUESTIONS)
                     .collect(Collectors.toList());
 
-            log.debug("Generated {} related questions", questions.size());
+            log.info("Generated {} related questions.", questions.size());
             return questions;
-
         } catch (Exception e) {
-            log.error("Failed to generate related questions", e);
+            log.error("Failed to generate related questions. Error: {}", e.getMessage());
             return Collections.emptyList();
         }
     }
 
     public List<String> generateFAQSuggestions(VectorStore vectorStore) {
-        log.debug("Generating FAQ suggestions from document corpus");
-
+        log.debug("Generating FAQ suggestions from document corpus.");
+        if (vectorStore == null) {
+            log.warn("VectorStore is null. Returning default FAQs.");
+            return getDefaultFAQs();
+        }
         try {
-            // Using SearchRequest.builder() - Correct approach
             SearchRequest searchRequest = SearchRequest.builder()
                     .query("overview summary main topics key information")
                     .topK(FAQ_SAMPLE_SIZE)
@@ -92,44 +101,48 @@ public class QuestionGenerationHelper {
                     .build();
 
             List<Document> docs = vectorStore.similaritySearch(searchRequest);
-
             if (docs == null || docs.isEmpty()) {
-                log.warn("No documents found for FAQ generation");
+                log.warn("No documents found for FAQ generation. Returning default FAQs.");
                 return getDefaultFAQs();
             }
-
             String sample = docs.stream()
                     .map(Document::getText)
+                    .filter(Objects::nonNull)
+                    .filter(s -> !s.isBlank())
                     .limit(5)
-                    .collect(Collectors.joining("\n\n"))
-                    .substring(0, Math.min(2000, docs.stream()
-                            .mapToInt(d -> d.getText().length())
-                            .sum()));
+                    .collect(Collectors.joining("\n\n"));
+
+            if (sample.length() > 2000) {
+                sample = sample.substring(0, 2000);
+            }
 
             String template = """
                     You are an FAQ question generator for document-based knowledge systems.
-                    
+
                     TASK: Generate 5 specific, answerable questions based on the DOCUMENT SAMPLES below.
-                    
+
                     REQUIREMENTS:
                     - Questions must be answerable from the document content
                     - Make questions specific and actionable
                     - Vary question types (what, how, when, who, why, where)
                     - Focus on the most important and commonly needed information
-                    
+
                     OUTPUT FORMAT:
                     Return ONLY the questions, one per line, without numbering or bullets.
-                    
+
                     DOCUMENT SAMPLES:
                     {sample}
                     """;
-
             PromptTemplate pt = new PromptTemplate(template);
             var prompt = pt.createMessage(Map.of("sample", sample));
 
             String response = chatClient.prompt(new Prompt(List.of(prompt))).call().content();
 
-            assert response != null;
+            if (response == null || response.trim().isEmpty()) {
+                log.warn("Empty response in FAQ generation; returning default FAQs.");
+                return getDefaultFAQs();
+            }
+
             List<String> faqs = Arrays.stream(response.split("\n"))
                     .map(String::trim)
                     .filter(s -> !s.isEmpty())
@@ -137,11 +150,10 @@ public class QuestionGenerationHelper {
                     .limit(5)
                     .collect(Collectors.toList());
 
-            log.debug("Generated {} FAQ suggestions", faqs.size());
+            log.info("Generated {} FAQ suggestions.", faqs.size());
             return faqs.isEmpty() ? getDefaultFAQs() : faqs;
-
         } catch (Exception e) {
-            log.error("Failed to generate FAQ suggestions", e);
+            log.error("Failed to generate FAQ suggestions. Error: {}", e.getMessage());
             return getDefaultFAQs();
         }
     }
